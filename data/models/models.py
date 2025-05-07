@@ -1,5 +1,5 @@
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import Column, String, ForeignKey, Integer, Text
+from sqlalchemy import Column, String, ForeignKey, Text
 
 db = SQLAlchemy()
 
@@ -8,7 +8,7 @@ class User(db.Model):
     User Model representing the system's users.
     Primary Key: user_id
     """
-    __tablename__ = 'Users'
+    __tablename__ = 'USERS'
 
     user_id = Column(String(26), primary_key=True, nullable=False, unique=True)
     email = Column(String(50), unique=True, nullable=False)
@@ -47,13 +47,13 @@ class ProcessedImageAnalysisData(db.Model):
 
     id = Column(String(26), primary_key=True)
     pdf_data_id = Column(String(26), ForeignKey('PDF_IMAGE_ANALYSIS_DATA.id'), nullable=False)
-    company = Column(String(100))
+    company_name = Column(String(100))
     sequences = Column(String(255))
     method_used = Column(String(100))
     body_region = Column(String(100))
     modality = Column(String(100))
-    medical_report_short = Column(Text)
-    medical_report_long = Column(Text)
+    report_section_short = Column(Text)
+    report_section_long = Column(Text)
     report_quality_score = Column(String(10))
     created_at = Column(String(19))
 
