@@ -1,23 +1,15 @@
-import datetime
+from data_manager_interface import DataManagerInterface
 
-class UserDataManager():
+
+class UserDataManager(DataManagerInterface):
     """
 
     """
-    def __init__(self, db_filepath):
-        """
 
-        """
+    def __init__(self, db_file_name):
         pass
 
-    def get_all_users(self):
-        """
-
-        :return:
-        """
-        pass
-
-    def create_user(self, id, email, password_hash, role, created_at, last_login=datetime.datetime.now().ctime()):
+    def add_user(self, id, email, password_hash, role, created_at, last_login):
         """
 
         :param id:
@@ -30,7 +22,68 @@ class UserDataManager():
         """
         pass
 
+    def update_user(self, id):
+        """
 
-if __name__ == "__main__":
-    print(datetime.datetime.now().ctime().split()[1:])
-    print("Format: " + str(len("05/07/2025 13:44:32")))
+        :param id:
+        :return:
+        """
+        pass
+
+    def delete_user(self, id):
+        """
+
+        :param id:
+        :return:
+        """
+        pass
+
+    def get_all_users(self):
+        """
+
+        :return:
+        """
+        pass
+
+    def get_user_info(self, id):
+        """
+
+        :param id:
+        :return:
+        """
+        pass
+
+
+class DataManagerPDF(DataManagerInterface):
+    """
+
+    """
+
+    def __init__(self):
+        pass
+
+    def add_pdf(self, pdf_filename, upload_date):
+        """
+        add a user upload in PDF format to the database.
+
+        :param pdf_filename:
+        :param upload_date:
+        :return:
+        """
+        pass
+
+    def get_pdf(self, pdf_id):
+        """
+
+        :param pdf_id:
+        :return:
+        """
+        pass
+
+    def delete_pdf(self, id):
+        """
+
+        :param id:
+        :return:
+        """
+        pass
