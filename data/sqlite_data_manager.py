@@ -1,4 +1,41 @@
-from data_manager_interface import DataManagerInterface
+# from data.data_manager_interface import DataManagerInterface
+
+
+from abc import ABC, abstractmethod
+from flask import Flask
+from data.models.models import db
+# from data.sqlite_data_manager import (UserDataManager, PDFDataManager, ProcessedDataManager,
+#                                  FindingDataManager, ErrorLogManager)
+
+class DataManagerInterface(ABC):
+    """
+    An abstract base class that defines the interface for data management operations.
+    """
+
+    def __init__(self, db_file_name):
+        """
+        Initializes the SQLiteDataManager, sets up Flask and SQLAlchemy,
+        and creates database tables if they don't exist.
+
+        Args:
+            db_file_name (str): The SQLite database file path.
+        """
+        self.app = Flask(__name__, template_folder="../templates", static_folder="../static")
+        self.app.config["SQLALCHEMY_DATABASE_URI"] = f'sqlite:///../{db_file_name}'
+        self.app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+        # self.app.config['SECRET_KEY'] = '6b809f7762e4a672f4d57d951d87c67bff1991ee9eea687d' # for flash messages
+
+        # Initialize all data managers
+        self.user_manager = UserDataManager(db_file_name)
+        self.pdf_manager = PDFDataManager(db_file_name)
+        self.processed_manager = ProcessedDataManager(db_file_name)
+        self.finding_manager = FindingDataManager(db_file_name)
+        self.errorlog_manager = ErrorLogManager(db_file_name)
+
+        db.init_app(self.app)
+        with self.app.app_context():
+            db.create_all()
+
 
 
 class UserDataManager(DataManagerInterface):
@@ -66,7 +103,7 @@ class PDFDataManager(DataManagerInterface):
     Manages ImageAnalysisPDF table operations.
     """
 
-    def __init__(self):
+    def __init__(self, db_filename):
         pass
 
     def add_pdf(self, id, user_id, original_filename, upload_date, raw_pdf_blob, processing_status):
@@ -117,7 +154,7 @@ class ProcessedDataManager(DataManagerInterface):
     Manages ProcessedImageAnalysisData table operations.
     """
 
-    def __init__(self):
+    def __init__(self, db_filename):
         pass
 
     def add_processed_data(self, id, pdf_data_id, company_name, sequences, method_used, body_region,
@@ -162,7 +199,7 @@ class FindingDataManager(DataManagerInterface):
     Manages Findings table operations.
     """
 
-    def __init__(self):
+    def __init__(self, db_file_name):
         pass
 
     def add_finding(self, id, processed_data_id, finding_type, location, value, unit, significance):
@@ -197,7 +234,7 @@ class ErrorLogManager(DataManagerInterface):
     Manages ErrorLog table operations.
     """
 
-    def __init__(self):
+    def __init__(self, db_file_name):
         pass
 
     def log_error(self, id, pdf_data_id, error_type, error_message, timestamp):
