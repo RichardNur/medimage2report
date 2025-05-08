@@ -1,6 +1,5 @@
 # from data.data_manager_interface import DataManagerInterface
 
-
 from abc import ABC, abstractmethod
 from flask import Flask
 from data.models.models import db
@@ -44,7 +43,7 @@ class UserDataManager(DataManagerInterface):
     """
 
     def __init__(self, db_file_name):
-        pass
+        super().__init__(db_file_name)
 
     def add_user(self, id, email, password_hash, name, role, created_at, last_login):
         """
@@ -103,8 +102,8 @@ class PDFDataManager(DataManagerInterface):
     Manages ImageAnalysisPDF table operations.
     """
 
-    def __init__(self, db_filename):
-        pass
+    def __init__(self, db_filename, db_file_name):
+        super().__init__(db_file_name)
 
     def add_pdf(self, id, user_id, original_filename, upload_date, raw_pdf_blob, processing_status):
         """
@@ -154,8 +153,8 @@ class ProcessedDataManager(DataManagerInterface):
     Manages ProcessedImageAnalysisData table operations.
     """
 
-    def __init__(self, db_filename):
-        pass
+    def __init__(self, db_filename, db_file_name):
+        super().__init__(db_file_name)
 
     def add_processed_data(self, id, pdf_data_id, company_name, sequences, method_used, body_region,
                            modality, report_section_short, report_section_long, report_quality_score, created_at):
@@ -200,7 +199,7 @@ class FindingDataManager(DataManagerInterface):
     """
 
     def __init__(self, db_file_name):
-        pass
+        super().__init__(db_file_name)
 
     def add_finding(self, id, processed_data_id, finding_type, location, value, unit, significance):
         """
@@ -235,7 +234,7 @@ class ErrorLogManager(DataManagerInterface):
     """
 
     def __init__(self, db_file_name):
-        pass
+        super().__init__(db_file_name)
 
     def log_error(self, id, pdf_data_id, error_type, error_message, timestamp):
         """
