@@ -17,7 +17,7 @@ class User(db.Model):
     password_hash = Column(String, nullable=False)
     name = Column(String(100), nullable=True)
     role = Column(String(150), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, nullable=False)
     last_login = Column(DateTime, nullable=True)
 
     def __repr__(self):
