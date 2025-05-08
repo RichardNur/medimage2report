@@ -76,7 +76,7 @@ This project is intended for research and clinical prototyping. Licensing detail
 
 ## 🤝 Contributions
 
-Contributions, feedback, and collaboration are welcome. Let’s build tools that support radiologists and improve patient care.
+Contributions, feedback, and collaboration are welcome. Let’s build tools that support medical staff and improve patient care.
 
 ---
 
