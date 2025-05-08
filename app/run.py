@@ -6,6 +6,7 @@ from data.models.models import ImageAnalysisPDF
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
 from utils.helpers import generate_unique_id
+from services.pdf_processing import extract_pdf_text, build_prompt, call_openai
 
 
 
@@ -36,7 +37,7 @@ def index():
             else:
                 flash('Invalid credentials', 'danger')
         except Exception as e:
-            current_app.logger.exception("Login error")
+            current_app.logger.exception("Login error", e)
             flash('An error occurred. Please try again later.', 'danger')
 
     return render_template('index.html')
