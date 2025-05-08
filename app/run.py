@@ -1,8 +1,12 @@
 # from data.data_manager_interface import DataManagerInterface
 from data.sqlite_data_manager import DataManagerInterface
-from flask import redirect, url_for, render_template, jsonify, abort, request
+from flask import redirect, url_for, render_template, jsonify, abort, request, flash, current_app
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from data.models.models import ImageAnalysisPDF
+from werkzeug.security import generate_password_hash, check_password_hash
+from datetime import datetime
+from utils.helpers import generate_unique_id
+
 
 
 
@@ -13,25 +17,94 @@ if __name__ == "__main__":
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
-    """
-    Home Route - Sections:
-    Info, LogIn/SignUp (POST/GET), Example
-    """
-    pass
+    # If the user is already logged in, redirect to status dashboard
+    if current_user.is_authenticated:
+        return redirect(url_for('status_dashboard'))
+
+    # Handle login form on home page
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip()
+        password = request.form.get('password', '')
+
+        try:
+            user = data_manager.user_manager.get_user_by_email(email)
+            if user and check_password_hash(user.password_hash, password):
+                login_user(user)
+                user.last_login = datetime.utcnow()
+                data_manager.user_manager.update_user(user.id, last_login=user.last_login)
+                return redirect(url_for('status_dashboard'))
+            else:
+                flash('Invalid credentials', 'danger')
+        except Exception as e:
+            current_app.logger.exception("Login error")
+            flash('An error occurred. Please try again later.', 'danger')
+
+    return render_template('index.html')
+
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
-    # form validation
-    # hash password
-    # create user and store in db
-    # redirect to login
-    pass
+    if current_user.is_authenticated:
+        return redirect(url_for('status_dashboard'))
+
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip()
+        name  = request.form.get('name', '').strip()
+        pwd   = request.form.get('password', '')
+        role  = 'user'
+
+        # Basic validation
+        if not email or not pwd:
+            flash('Email and password are required.', 'warning')
+            return render_template('register.html')
+
+        try:
+            # check for existing user
+            if data_manager.user_manager.get_user_by_email(email):
+                flash('Email already registered.', 'warning')
+                return render_template('register.html')
+
+            uid = generate_unique_id()  # your helper for a 26-char ID
+            pwd_hash = generate_password_hash(pwd)
+            created = datetime.utcnow()
+
+            data_manager.user_manager.add_user(
+                id=uid, email=email, password_hash=pwd_hash,
+                name=name, role=role, created_at=created, last_login=None
+            )
+            flash('Registration successful. Please log in.', 'success')
+            return redirect(url_for('login'))
+
+        except Exception:
+            current_app.logger.exception("Registration error")
+            flash('Registration failed. Please try again later.', 'danger')
+
+    return render_template('register.html')
+
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    # check credentials
-    # login_user(user)
-    pass
+    if current_user.is_authenticated:
+        return redirect(url_for('status_dashboard'))
+
+    if request.method == 'POST':
+        email    = request.form.get('email', '').strip()
+        password = request.form.get('password', '')
+
+        try:
+            user = data_manager.user_manager.get_user_by_email(email)
+            if user and check_password_hash(user.password_hash, password):
+                login_user(user)
+                user.last_login = datetime.utcnow()
+                data_manager.user_manager.update_user(user.id, last_login=user.last_login)
+                return redirect(url_for('status_dashboard'))
+            flash('Invalid email or password.', 'danger')
+        except Exception:
+            current_app.logger.exception("Login error")
+            flash('Login failed. Please try again later.', 'danger')
+
+    return render_template('login.html')
+
 
 @app.route('/upload', methods=['GET', 'POST'])
 @login_required
@@ -41,44 +114,83 @@ def upload_pdf():
     - Display drag-and-drop interface
     - Accept PDF file (POST)
     - Save to PDF_IMAGE_ANALYSIS_DATA
-    - Redirect to '/process/<pdf_id>'
+    - Redirect to request.url
     """
-    pass
+    if request.method == 'POST':
+        file = request.files.get('pdf_file')
+        if not file or not file.filename.lower().endswith('.pdf'):
+            flash('Please upload a PDF file.', 'warning')
+            return redirect(request.url)
+        try:
+            pid = generate_unique_id()
+            blob = file.read()
+            now = datetime.utcnow()
+            data_manager.pdf_manager.add_pdf(
+                id=pid,
+                user_id=current_user.id,
+                original_filename=file.filename,
+                upload_date=now,
+                raw_pdf_blob=blob,
+                processing_status='uploaded'
+            )
+            return redirect(url_for('process_pdf', pdf_id=pid))
+        except Exception:
+            current_app.logger.exception("Upload error")
+            flash('Upload failed. Try again.', 'danger')
+            return redirect(request.url)
 
-@app.route('/upload', methods=['GET', 'POST'])
-@login_required
-def upload_pdf():
-    """
-    Upload Route:
-    - Display drag-and-drop interface
-    - Accept PDF file (POST)
-    - Save to PDF_IMAGE_ANALYSIS_DATA
-    - Redirect to '/process/<pdf_id>'
-    """
-    pass
+    return render_template('upload.html')
 
 @app.route('/process/<pdf_id>', methods=['POST'])
 @login_required
 def process_pdf(pdf_id):
-    """
-    Process Route:
-    - Load PDF content from DB
-    - Extract data (e.g., via PyMuPDF or pdfminer)
-    - Compose and send OpenAI prompt
-    - Save response to PROCESSED_IMAGE_ANALYSIS_DATA
-    - Redirect to results view
-    """
-    pass
+    try:
+        entry = data_manager.pdf_manager.get_pdf(pdf_id)
+        if not entry or entry.user_id != current_user.id:
+            abort(404)
+
+        # 1) Extract text/images:
+        text_data = extract_pdf_text(entry.raw_pdf_blob)
+        # 2) Build prompt & call OpenAI:
+        prompt = build_prompt(text_data)
+        ai_response = call_openai(prompt)
+        # 3) Save processed result:
+        proc_id = generate_unique_id()
+        now = datetime.utcnow()
+        data_manager.processed_manager.add_processed_data(
+            id=proc_id,
+            pdf_data_id=pdf_id,
+            company_name=ai_response['company'],
+            sequences=ai_response['sequences'],
+            method_used=ai_response['method'],
+            body_region=ai_response['region'],
+            modality=ai_response['modality'],
+            report_section_short=ai_response['short_text'],
+            report_section_long=ai_response['long_text'],
+            report_quality_score=ai_response['quality'],
+            created_at=now
+        )
+        data_manager.pdf_manager.update_processing_status(pdf_id, 'processed')
+        return redirect(url_for('view_report', processed_id=proc_id))
+
+    except Exception:
+        current_app.logger.exception("Processing error")
+        data_manager.pdf_manager.update_processing_status(pdf_id, 'error')
+        return redirect(url_for('error_log', pdf_id=pdf_id))
+
 
 @app.route('/report/<processed_id>', methods=['GET'])
 @login_required
 def view_report(processed_id):
-    """
-    Report Route:
-    - Display the short and long report sections
-    - Also show structured findings (if any)
-    """
-    pass
+    try:
+        report = data_manager.processed_manager.get_processed_data(processed_id)
+        if not report or report.pdf_data.user_id != current_user.id:
+            abort(404)
+        return render_template('report.html', report=report)
+    except Exception:
+        current_app.logger.exception("View report error")
+        flash('Unable to load report.', 'danger')
+        return redirect(url_for('status_dashboard'))
 
 @app.route('/status', methods=['GET'])
 @login_required
@@ -88,7 +200,17 @@ def status_dashboard():
     - Show user uploads, their status (uploaded/processed/failed)
     - Link to reports or error logs
     """
-    pass
+    try:
+        uploads   = data_manager.pdf_manager.get_pdfs_by_user(current_user.id)
+        processed = {p.pdf_data_id for p in data_manager.processed_manager.list_all()}
+        return render_template('status.html',
+                               uploads=uploads,
+                               processed_ids=processed)
+    except Exception:
+        current_app.logger.exception("Status error")
+        flash('Could not fetch dashboard.', 'danger')
+        return render_template('status.html', uploads=[])
+
 
 @app.route('/errors/<pdf_id>', methods=['GET'])
 @login_required
@@ -97,30 +219,69 @@ def error_log(pdf_id):
     Error View Route:
     - Display error logs related to a specific PDF
     """
-    pass
+    try:
+        errors = data_manager.errorlog_manager.get_errors_by_pdf_id(pdf_id)
+        return render_template('errors.html', errors=errors, pdf_id=pdf_id)
+    except Exception:
+        current_app.logger.exception("Error log view")
+        flash('Unable to load error logs.', 'danger')
+        return redirect(url_for('status_dashboard'))
+
+
+@app.route('/profile', methods=['GET', 'POST'])
+@login_required
+def profile():
+    if request.method == 'POST':
+        name = request.form.get('name', '').strip() #email?
+        pwd  = request.form.get('password', '')
+        try:
+            updates = {}
+            if name:
+                updates['name'] = name
+            if pwd:
+                updates['password_hash'] = generate_password_hash(pwd)
+            if updates:
+                data_manager.user_manager.update_user(current_user.id, **updates)
+                flash('Profile updated.', 'success')
+            return redirect(url_for('profile'))
+        except Exception:
+            current_app.logger.exception("Profile update error")
+            flash('Update failed.', 'danger')
+    return render_template('profile.html', user=current_user)
+
+
+@app.route('/findings/<processed_id>', methods=['GET'])
+@login_required
+def view_findings(processed_id):
+    """
+    View Findings:
+    - Show detailed structured findings table
+    """
+    try:
+        report = data_manager.processed_manager.get_processed_data(processed_id)
+        if not report or report.pdf_data.user_id != current_user.id:
+            abort(404)
+        findings = data_manager.finding_manager.get_findings_by_processed_id(processed_id)
+        return render_template('findings.html', findings=findings, report=report)
+    except Exception:
+        current_app.logger.exception("View findings error")
+        flash('Unable to load findings.', 'danger')
+        return redirect(url_for('view_report', processed_id=processed_id))
+
 
 @app.route('/logout')
 @login_required
 def logout():
     logout_user()
-    return redirect(url_for('index'))
+    flash('You have been successfully logged out.', 'info')
+    return redirect(url_for('login'))
+
+
 
 """
     -------- FEATURES: (?) --------
 """
 
-@app.route('/profile', methods=['GET', 'POST'])
-@login_required
-def profile():
-    """
-    Profile Route:
-    - GET: Show user info
-    - POST: Allow user to update name or change password
-    """
-    if request.method == 'POST':
-        # Handle name/password change
-        pass
-    return render_template('profile.html', user=current_user)
 
 @app.route('/admin', methods=['GET'])
 @login_required
@@ -134,16 +295,6 @@ def admin_dashboard():
         abort(403)  # Forbidden
     all_uploads = ImageAnalysisPDF.query.all()
     return render_template('admin.html', uploads=all_uploads)
-
-
-@app.route('/findings/<processed_id>', methods=['GET'])
-@login_required
-def view_findings(processed_id):
-    """
-    Findings Route:
-    - Show detailed structured findings table
-    """
-    pass
 
 
 @app.route('/api/pdf/<pdf_id>', methods=['GET'])
