@@ -1,6 +1,6 @@
 from abc import ABC
 from flask_login import LoginManager, UserMixin
-from data.models.models import db
+from data.models.models import User, db
 
 class DataManagerInterface(ABC):
     """
@@ -22,11 +22,11 @@ class DataManagerInterface(ABC):
         self.app.config['SECRET_KEY'] = '6b809f7762e4a672f4d57d951d87c67bff1991ee9eea687d' # for flash messages
 
         # Initialize all data managers
-        self.user_manager = UserDataManager(db_file_name)
-        self.pdf_manager = PDFDataManager(db_file_name)
-        self.processed_manager = ProcessedDataManager(db_file_name)
-        self.finding_manager = FindingDataManager(db_file_name)
-        self.errorlog_manager = ErrorLogManager(db_file_name)
+        self.user_manager = UserDataManager()
+        self.pdf_manager = PDFDataManager()
+        self.processed_manager = ProcessedDataManager()
+        self.finding_manager = FindingDataManager()
+        self.errorlog_manager = ErrorLogManager()
 
         self.login_manager = LoginManager()
         self.login_manager.init_app(self.app)
@@ -37,39 +37,44 @@ class DataManagerInterface(ABC):
             db.create_all()
 
 
-
-class UserDataManager(DataManagerInterface, UserMixin):
+class UserDataManager:
     """
     Manages User table operations.
     """
 
-    def __init__(self, db_file_name):
-        pass
-
     def add_user(self, id, email, password_hash, name, role, created_at):
-        """
-        Add a new user.
+        try:
+            user = User(
+                id=id,
+                email=email,
+                password_hash=password_hash,
+                name=name,
+                role=role,
+                created_at=created_at,
+                last_login=None
+            )
+            db.session.add(user)
+            db.session.commit()
+            return user
+        except Exception as e:
+            db.session.rollback()
+            raise e
 
-        :param id:
-        :param email:
-        :param password_hash:
-        :param name:
-        :param role:
-        :param created_at:
-        :param last_login:
-        :return:
-        """
-        pass
+    def get_user_by_email(self, email):
+        return User.query.filter_by(email=email).first()
 
     def update_user(self, id, **kwargs):
-        """
-        Update existing user fields.
-
-        :param id:
-        :param kwargs: Fields to update
-        :return:
-        """
-        pass
+        try:
+            user = User.query.get(id)
+            if not user:
+                return None
+            for key, value in kwargs.items():
+                setattr(user, key, value)
+            db.session.commit()
+            return user
+        except Exception as e:
+            db.session.rollback()
+            raise e
 
     def delete_user(self, id):
         """
@@ -88,23 +93,12 @@ class UserDataManager(DataManagerInterface, UserMixin):
         """
         pass
 
-    def get_user_by_email(self, email):
-        """
-        Get a single user's info.
-
-        :param id:
-        :return:
-        """
-        pass
 
 
-class PDFDataManager(DataManagerInterface):
+class PDFDataManager:
     """
     Manages ImageAnalysisPDF table operations.
     """
-
-    def __init__(self, db_filename):
-        pass
 
     def add_pdf(self, id, user_id, original_filename, upload_date, raw_pdf_blob, processing_status):
         """
@@ -149,13 +143,10 @@ class PDFDataManager(DataManagerInterface):
         pass
 
 
-class ProcessedDataManager(DataManagerInterface):
+class ProcessedDataManager:
     """
     Manages ProcessedImageAnalysisData table operations.
     """
-
-    def __init__(self, db_filename):
-        pass
 
     def add_processed_data(self, id, pdf_data_id, company_name, sequences, method_used, body_region,
                            modality, report_section_short, report_section_long, report_quality_score, created_at):
@@ -194,13 +185,10 @@ class ProcessedDataManager(DataManagerInterface):
         pass
 
 
-class FindingDataManager(DataManagerInterface):
+class FindingDataManager:
     """
     Manages Findings table operations.
     """
-
-    def __init__(self, db_file_name):
-        pass
 
     def add_finding(self, id, processed_data_id, finding_type, location, value, unit, significance):
         """
@@ -229,13 +217,10 @@ class FindingDataManager(DataManagerInterface):
         pass
 
 
-class ErrorLogManager(DataManagerInterface):
+class ErrorLogManager:
     """
     Manages ErrorLog table operations.
     """
-
-    def __init__(self, db_file_name):
-        pass
 
     def log_error(self, id, pdf_data_id, error_type, error_message, timestamp):
         """
