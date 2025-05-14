@@ -1,20 +1,44 @@
-# from data.data_manager_interface import DataManagerInterface
 from data.sqlite_data_manager import DataManagerInterface
-from flask import redirect, url_for, render_template, jsonify, abort, request, flash, current_app
-from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
-from data.models.models import ImageAnalysisPDF
+from flask import Flask, redirect, url_for, render_template, jsonify, abort, request, flash, current_app
+from flask_login import login_user, logout_user, login_required, current_user, LoginManager
+from data.models.models import User
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
 from utils.helpers import generate_unique_id
-from services.pdf_processing import extract_pdf_text, build_prompt, call_openai
+from app.services.pdf_processing import extract_pdf_text, build_prompt, call_openai
+import os
 
+# Adjust the path relative to this file's location
+base_dir = os.path.abspath(os.path.dirname(__file__))
+template_dir = os.path.join(base_dir, 'app', "templates")
+static_dir = os.path.join(base_dir, 'app', "static")
 
+app = Flask(
+    __name__,
+    template_folder=template_dir,
+    static_folder=static_dir
+)
 
+# Global variable so it can be used inside routes
+data_manager = None
+def create_app():
+    global data_manager
+    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '.'))
+    db_file_name = os.path.join(base_dir, 'data', 'medimage2report.db')
+    data_manager = DataManagerInterface(db_file_name, app)
+    return app
 
-if __name__ == "__main__":
-    db_file_name = 'data/medimage2report.db'
-    data_manager = DataManagerInterface(db_file_name)
-    app = data_manager.app
+app = create_app()
+
+# Handle Login
+login_manager = LoginManager()
+login_manager.init_app(app)
+
+# Set up the user loader
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))  # or however you load a user
+
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
@@ -278,39 +302,42 @@ def logout():
     return redirect(url_for('login'))
 
 
+if __name__ == "__main__":
+    app.run(debug=True)
+
 
 """
     -------- FEATURES: (?) --------
 """
 
 
-@app.route('/admin', methods=['GET'])
-@login_required
-def admin_dashboard():
-    """
-    Admin Dashboard Route:
-    - List all user uploads, reports, and error logs
-    - Only accessible to admin users
-    """
-    if current_user.role != 'admin':
-        abort(403)  # Forbidden
-    all_uploads = ImageAnalysisPDF.query.all()
-    return render_template('admin.html', uploads=all_uploads)
-
-
-@app.route('/api/pdf/<pdf_id>', methods=['GET'])
-@login_required
-def api_pdf_data(pdf_id):
-    """
-    API Route:
-    - Return raw uploaded PDF data and metadata as JSON
-    """
-    pdf_entry = ImageAnalysisPDF.query.filter_by(id=pdf_id).first_or_404()
-    return jsonify({
-        'id': pdf_entry.id,
-        'filename': pdf_entry.original_filename,
-        'upload_date': pdf_entry.upload_date.isoformat(),
-        'status': pdf_entry.processing_status,
-        'user_id': pdf_entry.user_id
-    })
+# @app.route('/admin', methods=['GET'])
+# @login_required
+# def admin_dashboard():
+#     """
+#     Admin Dashboard Route:
+#     - List all user uploads, reports, and error logs
+#     - Only accessible to admin users
+#     """
+#     if current_user.role != 'admin':
+#         abort(403)  # Forbidden
+#     all_uploads = ImageAnalysisPDF.query.all()
+#     return render_template('admin.html', uploads=all_uploads)
+#
+#
+# @app.route('/api/pdf/<pdf_id>', methods=['GET'])
+# @login_required
+# def api_pdf_data(pdf_id):
+#     """
+#     API Route:
+#     - Return raw uploaded PDF data and metadata as JSON
+#     """
+#     pdf_entry = ImageAnalysisPDF.query.filter_by(id=pdf_id).first_or_404()
+#     return jsonify({
+#         'id': pdf_entry.id,
+#         'filename': pdf_entry.original_filename,
+#         'upload_date': pdf_entry.upload_date.isoformat(),
+#         'status': pdf_entry.processing_status,
+#         'user_id': pdf_entry.user_id
+#     })
 
