@@ -46,7 +46,7 @@ class UserDataManager(DataManagerInterface, UserMixin):
     def __init__(self, db_file_name):
         pass
 
-    def add_user(self, id, email, password_hash, name, role, created_at, last_login):
+    def add_user(self, id, email, password_hash, name, role, created_at):
         """
         Add a new user.
 
@@ -88,7 +88,7 @@ class UserDataManager(DataManagerInterface, UserMixin):
         """
         pass
 
-    def get_user_info(self, id):
+    def get_user_by_email(self, email):
         """
         Get a single user's info.
 
