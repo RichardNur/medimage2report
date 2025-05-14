@@ -1,19 +1,37 @@
-# from data.data_manager_interface import DataManagerInterface
 from data.sqlite_data_manager import DataManagerInterface
-from flask import redirect, url_for, render_template, jsonify, abort, request, flash, current_app
-from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
-from data.models.models import ImageAnalysisPDF
+from flask import Flask, redirect, url_for, render_template, abort, request, flash, current_app
+from flask_login import login_user, logout_user, login_required, current_user, LoginManager
+from data.models.models import User
 from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime
+from datetime import datetime, UTC
 from utils.helpers import generate_unique_id
+from app.services.pdf_processing import extract_pdf_text, build_prompt, call_openai
+import os
 
 
+# Set base paths
+base_dir = os.path.abspath(os.path.dirname(__file__))
+template_dir = os.path.join(base_dir, 'app', 'templates')
+static_dir = os.path.join(base_dir, 'app', 'static')
+db_file_name = os.path.join(base_dir, 'data', 'medimage2report.db')
 
+# Ensure data/ directory exists
+os.makedirs(os.path.dirname(db_file_name), exist_ok=True)
 
-if __name__ == "__main__":
-    db_file_name = 'data/medimage2report.db'
-    data_manager = DataManagerInterface(db_file_name)
-    app = data_manager.app
+# Initialize Flask app
+app = Flask(__name__, template_folder=template_dir, static_folder=static_dir)
+
+# Initialize Data Manager
+data_manager = DataManagerInterface(db_file_name, app)
+
+# Handle Login
+login_manager = LoginManager()
+login_manager.init_app(app)
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(user_id)
+
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
@@ -30,13 +48,13 @@ def index():
             user = data_manager.user_manager.get_user_by_email(email)
             if user and check_password_hash(user.password_hash, password):
                 login_user(user)
-                user.last_login = datetime.utcnow()
+                user.last_login = datetime.now(UTC)
                 data_manager.user_manager.update_user(user.id, last_login=user.last_login)
                 return redirect(url_for('status_dashboard'))
             else:
                 flash('Invalid credentials', 'danger')
         except Exception as e:
-            current_app.logger.exception("Login error")
+            current_app.logger.exception("Login error", e)
             flash('An error occurred. Please try again later.', 'danger')
 
     return render_template('index.html')
@@ -66,44 +84,17 @@ def register():
 
             uid = generate_unique_id()  # your helper for a 26-char ID
             pwd_hash = generate_password_hash(pwd)
-            created = datetime.utcnow()
+            created = datetime.now(UTC)
 
-            data_manager.user_manager.add_user(
-                id=uid, email=email, password_hash=pwd_hash,
-                name=name, role=role, created_at=created, last_login=None
-            )
+            data_manager.user_manager.add_user( id=uid, email=email, password_hash=pwd_hash, name=name, role=role, created_at=created)
             flash('Registration successful. Please log in.', 'success')
-            return redirect(url_for('login'))
+            return redirect(url_for('index'))
 
         except Exception:
             current_app.logger.exception("Registration error")
             flash('Registration failed. Please try again later.', 'danger')
 
     return render_template('register.html')
-
-
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    if current_user.is_authenticated:
-        return redirect(url_for('status_dashboard'))
-
-    if request.method == 'POST':
-        email    = request.form.get('email', '').strip()
-        password = request.form.get('password', '')
-
-        try:
-            user = data_manager.user_manager.get_user_by_email(email)
-            if user and check_password_hash(user.password_hash, password):
-                login_user(user)
-                user.last_login = datetime.utcnow()
-                data_manager.user_manager.update_user(user.id, last_login=user.last_login)
-                return redirect(url_for('status_dashboard'))
-            flash('Invalid email or password.', 'danger')
-        except Exception:
-            current_app.logger.exception("Login error")
-            flash('Login failed. Please try again later.', 'danger')
-
-    return render_template('login.html')
 
 
 @app.route('/upload', methods=['GET', 'POST'])
@@ -124,7 +115,7 @@ def upload_pdf():
         try:
             pid = generate_unique_id()
             blob = file.read()
-            now = datetime.utcnow()
+            now = datetime.now(UTC)
             data_manager.pdf_manager.add_pdf(
                 id=pid,
                 user_id=current_user.id,
@@ -156,7 +147,7 @@ def process_pdf(pdf_id):
         ai_response = call_openai(prompt)
         # 3) Save processed result:
         proc_id = generate_unique_id()
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         data_manager.processed_manager.add_processed_data(
             id=proc_id,
             pdf_data_id=pdf_id,
@@ -277,39 +268,68 @@ def logout():
     return redirect(url_for('login'))
 
 
+if __name__ == "__main__":
+    app.run(debug=True, host='0.0.0.0', port=5005)
+
 
 """
     -------- FEATURES: (?) --------
 """
 
 
-@app.route('/admin', methods=['GET'])
-@login_required
-def admin_dashboard():
-    """
-    Admin Dashboard Route:
-    - List all user uploads, reports, and error logs
-    - Only accessible to admin users
-    """
-    if current_user.role != 'admin':
-        abort(403)  # Forbidden
-    all_uploads = ImageAnalysisPDF.query.all()
-    return render_template('admin.html', uploads=all_uploads)
+# @app.route('/admin', methods=['GET'])
+# @login_required
+# def admin_dashboard():
+#     """
+#     Admin Dashboard Route:
+#     - List all user uploads, reports, and error logs
+#     - Only accessible to admin users
+#     """
+#     if current_user.role != 'admin':
+#         abort(403)  # Forbidden
+#     all_uploads = ImageAnalysisPDF.query.all()
+#     return render_template('admin.html', uploads=all_uploads)
+#
+#
+# @app.route('/api/pdf/<pdf_id>', methods=['GET'])
+# @login_required
+# def api_pdf_data(pdf_id):
+#     """
+#     API Route:
+#     - Return raw uploaded PDF data and metadata as JSON
+#     """
+#     pdf_entry = ImageAnalysisPDF.query.filter_by(id=pdf_id).first_or_404()
+#     return jsonify({
+#         'id': pdf_entry.id,
+#         'filename': pdf_entry.original_filename,
+#         'upload_date': pdf_entry.upload_date.isoformat(),
+#         'status': pdf_entry.processing_status,
+#         'user_id': pdf_entry.user_id
+#     })
 
 
-@app.route('/api/pdf/<pdf_id>', methods=['GET'])
-@login_required
-def api_pdf_data(pdf_id):
-    """
-    API Route:
-    - Return raw uploaded PDF data and metadata as JSON
-    """
-    pdf_entry = ImageAnalysisPDF.query.filter_by(id=pdf_id).first_or_404()
-    return jsonify({
-        'id': pdf_entry.id,
-        'filename': pdf_entry.original_filename,
-        'upload_date': pdf_entry.upload_date.isoformat(),
-        'status': pdf_entry.processing_status,
-        'user_id': pdf_entry.user_id
-    })
 
+# Login is handled in index.html
+
+# @app.route('/login', methods=['GET', 'POST'])
+# def login():
+#     if current_user.is_authenticated:
+#         return redirect(url_for('status_dashboard'))
+#
+#     if request.method == 'POST':
+#         email    = request.form.get('email', '').strip()
+#         password = request.form.get('password', '')
+#
+#         try:
+#             user = data_manager.user_manager.get_user_by_email(email)
+#             if user and check_password_hash(user.password_hash, password):
+#                 login_user(user)
+#                 user.last_login = datetime.utcnow()
+#                 data_manager.user_manager.update_user(user.id, last_login=user.last_login)
+#                 return redirect(url_for('status_dashboard'))
+#             flash('Invalid email or password.', 'danger')
+#         except Exception:
+#             current_app.logger.exception("Login error")
+#             flash('Login failed. Please try again later.', 'danger')
+#
+#     return render_template('login.html')

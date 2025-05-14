@@ -1,17 +1,13 @@
-# from data.data_manager_interface import DataManagerInterface
-
-from abc import ABC, abstractmethod
-from flask import Flask
-from data.models.models import db
-# from data.sqlite_data_manager import (UserDataManager, PDFDataManager, ProcessedDataManager,
-#                                  FindingDataManager, ErrorLogManager)
+from abc import ABC
+from flask_login import LoginManager, UserMixin
+from data.models.models import User, db
 
 class DataManagerInterface(ABC):
     """
     An abstract base class that defines the interface for data management operations.
     """
 
-    def __init__(self, db_file_name):
+    def __init__(self, db_file_name, app):
         """
         Initializes the SQLiteDataManager, sets up Flask and SQLAlchemy,
         and creates database tables if they don't exist.
@@ -19,56 +15,66 @@ class DataManagerInterface(ABC):
         Args:
             db_file_name (str): The SQLite database file path.
         """
-        self.app = Flask(__name__, template_folder="../templates", static_folder="../static")
-        self.app.config["SQLALCHEMY_DATABASE_URI"] = f'sqlite:///../{db_file_name}'
+
+        self.app = app
+        self.app.config["SQLALCHEMY_DATABASE_URI"] = f'sqlite:///{db_file_name}'
         self.app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-        # self.app.config['SECRET_KEY'] = '6b809f7762e4a672f4d57d951d87c67bff1991ee9eea687d' # for flash messages
+        self.app.config['SECRET_KEY'] = '6b809f7762e4a672f4d57d951d87c67bff1991ee9eea687d' # for flash messages
 
         # Initialize all data managers
-        self.user_manager = UserDataManager(db_file_name)
-        self.pdf_manager = PDFDataManager(db_file_name)
-        self.processed_manager = ProcessedDataManager(db_file_name)
-        self.finding_manager = FindingDataManager(db_file_name)
-        self.errorlog_manager = ErrorLogManager(db_file_name)
+        self.user_manager = UserDataManager()
+        self.pdf_manager = PDFDataManager()
+        self.processed_manager = ProcessedDataManager()
+        self.finding_manager = FindingDataManager()
+        self.errorlog_manager = ErrorLogManager()
+
+        self.login_manager = LoginManager()
+        self.login_manager.init_app(self.app)
+        self.login_manager.login_view = 'login'  # endpoint name for login
 
         db.init_app(self.app)
         with self.app.app_context():
             db.create_all()
 
 
-
-class UserDataManager(DataManagerInterface):
+class UserDataManager:
     """
     Manages User table operations.
     """
 
-    def __init__(self, db_file_name):
-        super().__init__(db_file_name)
+    def add_user(self, id, email, password_hash, name, role, created_at):
+        try:
+            user = User(
+                id=id,
+                email=email,
+                password_hash=password_hash,
+                name=name,
+                role=role,
+                created_at=created_at,
+                last_login=None
+            )
+            db.session.add(user)
+            db.session.commit()
+            return user
+        except Exception as e:
+            db.session.rollback()
+            raise e
 
-    def add_user(self, id, email, password_hash, name, role, created_at, last_login):
-        """
-        Add a new user.
-
-        :param id:
-        :param email:
-        :param password_hash:
-        :param name:
-        :param role:
-        :param created_at:
-        :param last_login:
-        :return:
-        """
-        pass
+    def get_user_by_email(self, email):
+        return User.query.filter_by(email=email).first()
 
     def update_user(self, id, **kwargs):
-        """
-        Update existing user fields.
-
-        :param id:
-        :param kwargs: Fields to update
-        :return:
-        """
-        pass
+        try:
+            user = User.query.get(id)
+            if not user:
+                return None
+            for key, value in kwargs.items():
+                setattr(user, key, value)
+            db.session.commit()
+            return user
+        except Exception as e:
+            db.session.rollback()
+            raise e
 
     def delete_user(self, id):
         """
@@ -87,23 +93,12 @@ class UserDataManager(DataManagerInterface):
         """
         pass
 
-    def get_user_info(self, id):
-        """
-        Get a single user's info.
-
-        :param id:
-        :return:
-        """
-        pass
 
 
-class PDFDataManager(DataManagerInterface):
+class PDFDataManager:
     """
     Manages ImageAnalysisPDF table operations.
     """
-
-    def __init__(self, db_filename, db_file_name):
-        super().__init__(db_file_name)
 
     def add_pdf(self, id, user_id, original_filename, upload_date, raw_pdf_blob, processing_status):
         """
@@ -148,13 +143,10 @@ class PDFDataManager(DataManagerInterface):
         pass
 
 
-class ProcessedDataManager(DataManagerInterface):
+class ProcessedDataManager:
     """
     Manages ProcessedImageAnalysisData table operations.
     """
-
-    def __init__(self, db_filename, db_file_name):
-        super().__init__(db_file_name)
 
     def add_processed_data(self, id, pdf_data_id, company_name, sequences, method_used, body_region,
                            modality, report_section_short, report_section_long, report_quality_score, created_at):
@@ -193,13 +185,10 @@ class ProcessedDataManager(DataManagerInterface):
         pass
 
 
-class FindingDataManager(DataManagerInterface):
+class FindingDataManager:
     """
     Manages Findings table operations.
     """
-
-    def __init__(self, db_file_name):
-        super().__init__(db_file_name)
 
     def add_finding(self, id, processed_data_id, finding_type, location, value, unit, significance):
         """
@@ -228,13 +217,10 @@ class FindingDataManager(DataManagerInterface):
         pass
 
 
-class ErrorLogManager(DataManagerInterface):
+class ErrorLogManager:
     """
     Manages ErrorLog table operations.
     """
-
-    def __init__(self, db_file_name):
-        super().__init__(db_file_name)
 
     def log_error(self, id, pdf_data_id, error_type, error_message, timestamp):
         """
