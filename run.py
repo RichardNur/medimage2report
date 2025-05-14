@@ -35,9 +35,6 @@ def load_user(user_id):
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
-    # If the user is already logged in, redirect to status dashboard
-    if current_user.is_authenticated:
-        return redirect(url_for('status_dashboard'))
 
     # Handle login form on home page
     if request.method == 'POST':
@@ -50,7 +47,7 @@ def index():
                 login_user(user)
                 user.last_login = datetime.now(UTC)
                 data_manager.user_manager.update_user(user.id, last_login=user.last_login)
-                return redirect(url_for('status_dashboard'))
+                return redirect(url_for('index'))
             else:
                 flash('Invalid credentials', 'danger')
         except Exception as e:
@@ -265,7 +262,7 @@ def view_findings(processed_id):
 def logout():
     logout_user()
     flash('You have been successfully logged out.', 'info')
-    return redirect(url_for('login'))
+    return redirect(url_for('index'))  # ← changed from 'login' to 'index'
 
 
 if __name__ == "__main__":
