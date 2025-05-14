@@ -1,17 +1,13 @@
-# from data.data_manager_interface import DataManagerInterface
-
-from abc import ABC, abstractmethod
-from flask import Flask
+from abc import ABC
+from flask_login import LoginManager, UserMixin
 from data.models.models import db
-# from data.sqlite_data_manager import (UserDataManager, PDFDataManager, ProcessedDataManager,
-#                                  FindingDataManager, ErrorLogManager)
 
 class DataManagerInterface(ABC):
     """
     An abstract base class that defines the interface for data management operations.
     """
 
-    def __init__(self, db_file_name):
+    def __init__(self, db_file_name, app):
         """
         Initializes the SQLiteDataManager, sets up Flask and SQLAlchemy,
         and creates database tables if they don't exist.
@@ -19,10 +15,11 @@ class DataManagerInterface(ABC):
         Args:
             db_file_name (str): The SQLite database file path.
         """
-        self.app = Flask(__name__, template_folder="../templates", static_folder="../static")
-        self.app.config["SQLALCHEMY_DATABASE_URI"] = f'sqlite:///../{db_file_name}'
+
+        self.app = app
+        self.app.config["SQLALCHEMY_DATABASE_URI"] = f'sqlite:///{db_file_name}'
         self.app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-        # self.app.config['SECRET_KEY'] = '6b809f7762e4a672f4d57d951d87c67bff1991ee9eea687d' # for flash messages
+        self.app.config['SECRET_KEY'] = '6b809f7762e4a672f4d57d951d87c67bff1991ee9eea687d' # for flash messages
 
         # Initialize all data managers
         self.user_manager = UserDataManager(db_file_name)
@@ -31,19 +28,23 @@ class DataManagerInterface(ABC):
         self.finding_manager = FindingDataManager(db_file_name)
         self.errorlog_manager = ErrorLogManager(db_file_name)
 
+        self.login_manager = LoginManager()
+        self.login_manager.init_app(self.app)
+        self.login_manager.login_view = 'login'  # endpoint name for login
+
         db.init_app(self.app)
         with self.app.app_context():
             db.create_all()
 
 
 
-class UserDataManager(DataManagerInterface):
+class UserDataManager(DataManagerInterface, UserMixin):
     """
     Manages User table operations.
     """
 
     def __init__(self, db_file_name):
-        super().__init__(db_file_name)
+        pass
 
     def add_user(self, id, email, password_hash, name, role, created_at, last_login):
         """
@@ -102,8 +103,8 @@ class PDFDataManager(DataManagerInterface):
     Manages ImageAnalysisPDF table operations.
     """
 
-    def __init__(self, db_filename, db_file_name):
-        super().__init__(db_file_name)
+    def __init__(self, db_filename):
+        pass
 
     def add_pdf(self, id, user_id, original_filename, upload_date, raw_pdf_blob, processing_status):
         """
@@ -153,8 +154,8 @@ class ProcessedDataManager(DataManagerInterface):
     Manages ProcessedImageAnalysisData table operations.
     """
 
-    def __init__(self, db_filename, db_file_name):
-        super().__init__(db_file_name)
+    def __init__(self, db_filename):
+        pass
 
     def add_processed_data(self, id, pdf_data_id, company_name, sequences, method_used, body_region,
                            modality, report_section_short, report_section_long, report_quality_score, created_at):
@@ -199,7 +200,7 @@ class FindingDataManager(DataManagerInterface):
     """
 
     def __init__(self, db_file_name):
-        super().__init__(db_file_name)
+        pass
 
     def add_finding(self, id, processed_data_id, finding_type, location, value, unit, significance):
         """
@@ -234,7 +235,7 @@ class ErrorLogManager(DataManagerInterface):
     """
 
     def __init__(self, db_file_name):
-        super().__init__(db_file_name)
+        pass
 
     def log_error(self, id, pdf_data_id, error_type, error_message, timestamp):
         """
