@@ -1,43 +1,32 @@
 from data.sqlite_data_manager import DataManagerInterface
-from flask import Flask, redirect, url_for, render_template, jsonify, abort, request, flash, current_app
+from flask import Flask, redirect, url_for, render_template, abort, request, flash, current_app
 from flask_login import login_user, logout_user, login_required, current_user, LoginManager
 from data.models.models import User
 from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime
+from datetime import datetime, UTC
 from utils.helpers import generate_unique_id
 from app.services.pdf_processing import extract_pdf_text, build_prompt, call_openai
 import os
 
-# Adjust the path relative to this file's location
+
+# Set base paths
 base_dir = os.path.abspath(os.path.dirname(__file__))
-template_dir = os.path.join(base_dir, 'app', "templates")
-static_dir = os.path.join(base_dir, 'app', "static")
+template_dir = os.path.join(base_dir, 'app', 'templates')
+static_dir = os.path.join(base_dir, 'app', 'static')
+db_file_name = os.path.join(base_dir, 'data', 'medimage2report.db')
 
-app = Flask(
-    __name__,
-    template_folder=template_dir,
-    static_folder=static_dir
-)
+# Ensure data/ directory exists
+os.makedirs(os.path.dirname(db_file_name), exist_ok=True)
 
-# Global variable so it can be used inside routes
-data_manager = None
-def create_app():
-    global data_manager
-    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '.'))
-    db_file_name = os.path.join(base_dir, 'data', 'medimage2report.db')
-    data_manager = DataManagerInterface(db_file_name, app)
-    return app
+# Initialize Flask app
+app = Flask(__name__, template_folder=template_dir, static_folder=static_dir)
 
-app = create_app()
+# Initialize Data Manager
+data_manager = DataManagerInterface(db_file_name, app)
 
 # Handle Login
 login_manager = LoginManager()
 login_manager.init_app(app)
-
-# Set up the user loader
-@login_manager.user_loader
-def load_user(user_id):
-    return User.query.get(int(user_id))  # or however you load a user
 
 
 @app.route('/', methods=['GET', 'POST'])
@@ -55,7 +44,7 @@ def index():
             user = data_manager.user_manager.get_user_by_email(email)
             if user and check_password_hash(user.password_hash, password):
                 login_user(user)
-                user.last_login = datetime.utcnow()
+                user.last_login = datetime.now(UTC)
                 data_manager.user_manager.update_user(user.id, last_login=user.last_login)
                 return redirect(url_for('status_dashboard'))
             else:
@@ -91,44 +80,17 @@ def register():
 
             uid = generate_unique_id()  # your helper for a 26-char ID
             pwd_hash = generate_password_hash(pwd)
-            created = datetime.utcnow()
+            created = datetime.now(UTC)
 
-            data_manager.user_manager.add_user(
-                id=uid, email=email, password_hash=pwd_hash,
-                name=name, role=role, created_at=created, last_login=None
-            )
+            data_manager.user_manager.add_user( id=uid, email=email, password_hash=pwd_hash, name=name, role=role, created_at=created)
             flash('Registration successful. Please log in.', 'success')
-            return redirect(url_for('login'))
+            return redirect(url_for('index'))
 
         except Exception:
             current_app.logger.exception("Registration error")
             flash('Registration failed. Please try again later.', 'danger')
 
     return render_template('register.html')
-
-
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    if current_user.is_authenticated:
-        return redirect(url_for('status_dashboard'))
-
-    if request.method == 'POST':
-        email    = request.form.get('email', '').strip()
-        password = request.form.get('password', '')
-
-        try:
-            user = data_manager.user_manager.get_user_by_email(email)
-            if user and check_password_hash(user.password_hash, password):
-                login_user(user)
-                user.last_login = datetime.utcnow()
-                data_manager.user_manager.update_user(user.id, last_login=user.last_login)
-                return redirect(url_for('status_dashboard'))
-            flash('Invalid email or password.', 'danger')
-        except Exception:
-            current_app.logger.exception("Login error")
-            flash('Login failed. Please try again later.', 'danger')
-
-    return render_template('login.html')
 
 
 @app.route('/upload', methods=['GET', 'POST'])
@@ -149,7 +111,7 @@ def upload_pdf():
         try:
             pid = generate_unique_id()
             blob = file.read()
-            now = datetime.utcnow()
+            now = datetime.now(UTC)
             data_manager.pdf_manager.add_pdf(
                 id=pid,
                 user_id=current_user.id,
@@ -181,7 +143,7 @@ def process_pdf(pdf_id):
         ai_response = call_openai(prompt)
         # 3) Save processed result:
         proc_id = generate_unique_id()
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         data_manager.processed_manager.add_processed_data(
             id=proc_id,
             pdf_data_id=pdf_id,
@@ -303,7 +265,7 @@ def logout():
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=True, host='0.0.0.0', port=5005)
 
 
 """
@@ -341,3 +303,29 @@ if __name__ == "__main__":
 #         'user_id': pdf_entry.user_id
 #     })
 
+
+
+# Login is handled in index.html
+
+# @app.route('/login', methods=['GET', 'POST'])
+# def login():
+#     if current_user.is_authenticated:
+#         return redirect(url_for('status_dashboard'))
+#
+#     if request.method == 'POST':
+#         email    = request.form.get('email', '').strip()
+#         password = request.form.get('password', '')
+#
+#         try:
+#             user = data_manager.user_manager.get_user_by_email(email)
+#             if user and check_password_hash(user.password_hash, password):
+#                 login_user(user)
+#                 user.last_login = datetime.utcnow()
+#                 data_manager.user_manager.update_user(user.id, last_login=user.last_login)
+#                 return redirect(url_for('status_dashboard'))
+#             flash('Invalid email or password.', 'danger')
+#         except Exception:
+#             current_app.logger.exception("Login error")
+#             flash('Login failed. Please try again later.', 'danger')
+#
+#     return render_template('login.html')
