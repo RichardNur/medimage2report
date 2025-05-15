@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Generated Medical Report</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        @media print {
+            .no-print {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body class="bg-light">
+
+<!-- Navbar -->
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 no-print">
+    <div class="container">
+        <a class="navbar-brand" href="{{ url_for('index') }}">medimage2report</a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav me-auto">
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('status_dashboard') }}">Dashboard</a></li>
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('upload_pdf') }}">Upload</a></li>
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('logout') }}">Logout</a></li>
+            </ul>
+        </div>
+    </div>
+</nav>
+
+<!-- Report Section -->
+<div class="container">
+    <div class="text-center mb-4">
+        <h2>Generated Report</h2>
+        <p class="text-muted">AI-generated medical summary based on your uploaded image analysis</p>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-header bg-primary text-white">Quick Summary</div>
+        <div class="card-body">
+            <p>{{ report.report_section_short }}</p>
+        </div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
+            <span>Detailed Report</span>
+            <div class="no-print">
+                <button class="btn btn-sm btn-light" onclick="copyText()">📋 Copy</button>
+                <button class="btn btn-sm btn-light" onclick="downloadText()">⬇️ Download</button>
+                <button class="btn btn-sm btn-light" onclick="window.print()">🖨️ Export PDF</button>
+            </div>
+        </div>
+        <div class="card-body">
+            <pre id="reportText" style="white-space: pre-wrap;">{{ report.report_section_long }}</pre>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6">
+            <h5>Meta Information</h5>
+            <ul class="list-group">
+                <li class="list-group-item"><strong>Company:</strong> {{ report.company_name }}</li>
+                <li class="list-group-item"><strong>Method:</strong> {{ report.method_used }}</li>
+                <li class="list-group-item"><strong>Region:</strong> {{ report.body_region }}</li>
+                <li class="list-group-item"><strong>Modality:</strong> {{ report.modality }}</li>
+                <li class="list-group-item"><strong>Sequences:</strong> {{ report.sequences }}</li>
+                <li class="list-group-item"><strong>Quality Score:</strong> {{ report.report_quality_score }}</li>
+                <li class="list-group-item"><strong>Created:</strong> {{ report.created_at.strftime('%Y-%m-%d %H:%M') }}</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="mt-4 no-print">
+        <a href="{{ url_for('status_dashboard') }}" class="btn btn-outline-primary">← Back to Dashboard</a>
+    </div>
+</div>
+
+<!-- Footer -->
+<footer class="bg-dark text-white text-center py-3 mt-5">
+    <small>&copy; 2025 medimage2report. All rights reserved.</small>
+</footer>
+
+<!-- Scripts -->
+<script>
+    function copyText() {
+        const text = document.getElementById('reportText').innerText;
+        navigator.clipboard.writeText(text).then(() => {
+            alert('Copied to clipboard');
+        }, () => {
+            alert('Copy failed');
+        });
+    }
+
+    function downloadText() {
+        const text = document.getElementById('reportText').innerText;
+        const blob = new Blob([text], { type: 'text/plain' });
+        const link = document.createElement('a');
+        link.download = 'report.txt';
+        link.href = URL.createObjectURL(blob);
+        link.click();
+    }
+</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

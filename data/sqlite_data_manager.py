@@ -1,6 +1,6 @@
 from abc import ABC
 from flask_login import LoginManager, UserMixin
-from data.models.models import User, db
+from data.models.models import User, ImageAnalysisPDF, ProcessedImageAnalysisData,db
 
 class DataManagerInterface(ABC):
     """
@@ -101,46 +101,52 @@ class PDFDataManager:
     """
 
     def add_pdf(self, id, user_id, original_filename, upload_date, raw_pdf_blob, processing_status):
-        """
-        Add uploaded PDF metadata.
+        try:
+            pdf_entry = ImageAnalysisPDF(
+                id=id,
+                user_id=user_id,
+                original_filename=original_filename,
+                upload_date=upload_date,
+                raw_pdf_blob=raw_pdf_blob,
+                processing_status=processing_status
+            )
+            db.session.add(pdf_entry)
+            db.session.commit()
+            return pdf_entry
+        except Exception as e:
+            db.session.rollback()
+            raise e
 
-        :param id:
-        :param user_id:
-        :param original_filename:
-        :param upload_date:
-        :param raw_pdf_blob:
-        :param processing_status:
-        :return:
-        """
-        pass
+    def get_pdfs_by_user(self, user_id):
+        return ImageAnalysisPDF.query.filter_by(user_id=user_id).all()
 
     def get_pdf(self, pdf_id):
-        """
-        Retrieve a PDF entry by ID.
-
-        :param pdf_id:
-        :return:
-        """
-        pass
+        return ImageAnalysisPDF.query.filter_by(id=pdf_id).first()
 
     def delete_pdf(self, id):
-        """
-        Delete PDF by ID.
-
-        :param id:
-        :return:
-        """
-        pass
+        try:
+            pdf_entry = self.get_pdf(id)
+            if pdf_entry:
+                db.session.delete(pdf_entry)
+                db.session.commit()
+                return True
+            return False
+        except Exception as e:
+            db.session.rollback()
+            raise e
 
     def update_processing_status(self, pdf_id, new_status):
-        """
-        Update processing status of a PDF entry.
+        try:
+            pdf_entry = self.get_pdf(pdf_id)
+            if pdf_entry:
+                pdf_entry.processing_status = new_status
+                db.session.commit()
+                return pdf_entry
+            return None
+        except Exception as e:
+            db.session.rollback()
+            raise e
 
-        :param pdf_id:
-        :param new_status:
-        :return:
-        """
-        pass
 
 
 class ProcessedDataManager:
@@ -150,39 +156,48 @@ class ProcessedDataManager:
 
     def add_processed_data(self, id, pdf_data_id, company_name, sequences, method_used, body_region,
                            modality, report_section_short, report_section_long, report_quality_score, created_at):
-        """
-        Add processed image analysis data.
-
-        :return:
-        """
-        pass
+        try:
+            entry = ProcessedImageAnalysisData(
+                id=id,
+                pdf_data_id=pdf_data_id,
+                company_name=company_name,
+                sequences=sequences,
+                method_used=method_used,
+                body_region=body_region,
+                modality=modality,
+                report_section_short=report_section_short,
+                report_section_long=report_section_long,
+                report_quality_score=report_quality_score,
+                created_at=created_at
+            )
+            db.session.add(entry)
+            db.session.commit()
+            return entry
+        except Exception as e:
+            db.session.rollback()
+            raise e
 
     def get_processed_data(self, id):
-        """
-        Retrieve processed data by ID.
-
-        :param id:
-        :return:
-        """
-        pass
+        return ProcessedImageAnalysisData.query.get(id)
 
     def delete_processed_data(self, id):
-        """
-        Delete processed data by ID.
+        try:
+            entry = ProcessedImageAnalysisData.query.get(id)
+            if entry:
+                db.session.delete(entry)
+                db.session.commit()
+                return True
+            return False
+        except Exception as e:
+            db.session.rollback()
+            raise e
 
-        :param id:
-        :return:
+    def list_all(self):
         """
-        pass
+        Return all processed reports from the database.
+        """
+        return ProcessedImageAnalysisData.query.all()
 
-    def list_processed_reports_by_pdf(self, pdf_data_id):
-        """
-        List all processed entries for a given PDF.
-
-        :param pdf_data_id:
-        :return:
-        """
-        pass
 
 
 class FindingDataManager:

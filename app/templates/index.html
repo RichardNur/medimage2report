@@ -41,6 +41,13 @@
     {% if current_user.is_authenticated %}
         <div class="alert alert-success text-center">
             <h4 class="mb-3">Welcome, {{ current_user.name or current_user.email }}!</h4>
+
+            <!-- Action Buttons -->
+            <div class="d-grid gap-2 d-sm-flex justify-content-sm-center mb-3">
+                <a href="{{ url_for('upload_pdf') }}" class="btn btn-outline-primary btn-lg px-4">Medical Report Generator (PDF-Upload)</a>
+                <a href="#" class="btn btn-outline-secondary btn-lg px-4 disabled">TBC-Recognizer (DICOM-Upload)</a>
+            </div>
+
             <a href="{{ url_for('logout') }}" class="btn btn-danger">Log Out</a>
         </div>
     {% else %}
