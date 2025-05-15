@@ -1,12 +1,14 @@
 from data.sqlite_data_manager import DataManagerInterface
 from flask import Flask, redirect, url_for, render_template, abort, request, flash, current_app
 from flask_login import login_user, logout_user, login_required, current_user, LoginManager
-from data.models.models import User
+from data.models.models import User, db
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, UTC
 from utils.helpers import generate_unique_id
 from app.services.pdf_processing import extract_pdf_text, build_prompt, call_openai
 import os
+from sqlalchemy.orm import Session
+
 
 
 # Set base paths
@@ -30,12 +32,13 @@ login_manager.init_app(app)
 
 @login_manager.user_loader
 def load_user(user_id):
-    return User.query.get(user_id)
+    with app.app_context():
+        session: Session = db.session
+        return session.get(User, user_id)
 
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
-
     # Handle login form on home page
     if request.method == 'POST':
         email = request.form.get('email', '').strip()
@@ -51,7 +54,7 @@ def index():
             else:
                 flash('Invalid credentials', 'danger')
         except Exception as e:
-            current_app.logger.exception("Login error", e)
+            current_app.logger.exception("Login error: %s", str(e))
             flash('An error occurred. Please try again later.', 'danger')
 
     return render_template('index.html')
@@ -122,27 +125,47 @@ def upload_pdf():
                 processing_status='uploaded'
             )
             return redirect(url_for('process_pdf', pdf_id=pid))
+
         except Exception:
             current_app.logger.exception("Upload error")
             flash('Upload failed. Try again.', 'danger')
             return redirect(request.url)
 
-    return render_template('upload.html')
+    return render_template('upload_pdf.html')
 
-@app.route('/process/<pdf_id>', methods=['POST'])
+
+@app.route('/process/<pdf_id>', methods=['GET', 'POST'])
 @login_required
 def process_pdf(pdf_id):
+    """
+    Process Route:
+    - Triggered by redirect from /upload (GET)
+    - Extract content from uploaded PDF
+    - Build prompt and call OpenAI
+    - Store the processed output
+    - Redirect to /view_report/<processed_id> or error page
+    """
     try:
         entry = data_manager.pdf_manager.get_pdf(pdf_id)
         if not entry or entry.user_id != current_user.id:
             abort(404)
 
-        # 1) Extract text/images:
+        # Update status to "processing"
+        data_manager.pdf_manager.update_processing_status(pdf_id, 'processing')
+
+        # Step 1: Extract content from PDF
+
+        """
+        FIX TEXT-EXTRACTION FROM PDF!!!!
+        """
+
         text_data = extract_pdf_text(entry.raw_pdf_blob)
-        # 2) Build prompt & call OpenAI:
+
+        # Step 2: Build prompt and call OpenAI
         prompt = build_prompt(text_data)
         ai_response = call_openai(prompt)
-        # 3) Save processed result:
+
+        # Step 3: Save processed result
         proc_id = generate_unique_id()
         now = datetime.now(UTC)
         data_manager.processed_manager.add_processed_data(
@@ -158,7 +181,10 @@ def process_pdf(pdf_id):
             report_quality_score=ai_response['quality'],
             created_at=now
         )
+
+        # Update PDF status
         data_manager.pdf_manager.update_processing_status(pdf_id, 'processed')
+
         return redirect(url_for('view_report', processed_id=proc_id))
 
     except Exception:
@@ -175,10 +201,12 @@ def view_report(processed_id):
         if not report or report.pdf_data.user_id != current_user.id:
             abort(404)
         return render_template('report.html', report=report)
+
     except Exception:
         current_app.logger.exception("View report error")
         flash('Unable to load report.', 'danger')
         return redirect(url_for('status_dashboard'))
+
 
 @app.route('/status', methods=['GET'])
 @login_required
@@ -209,6 +237,7 @@ def error_log(pdf_id):
     """
     try:
         errors = data_manager.errorlog_manager.get_errors_by_pdf_id(pdf_id)
+        errors = errors or []
         return render_template('errors.html', errors=errors, pdf_id=pdf_id)
     except Exception:
         current_app.logger.exception("Error log view")
@@ -262,7 +291,7 @@ def view_findings(processed_id):
 def logout():
     logout_user()
     flash('You have been successfully logged out.', 'info')
-    return redirect(url_for('index'))  # ← changed from 'login' to 'index'
+    return redirect(url_for('index'))
 
 
 if __name__ == "__main__":
