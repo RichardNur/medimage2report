@@ -3,3 +3,6 @@ __pycache__/
 *.pyc
 # Environment
 .env
+# Ignore Python cache
+__pycache__/
+*.py[cod]
