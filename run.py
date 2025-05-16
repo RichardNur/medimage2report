@@ -3,7 +3,7 @@ from flask import Flask, redirect, url_for, render_template, abort, request, fla
 from flask_login import login_user, logout_user, login_required, current_user, LoginManager
 from data.models.models import User, db
 from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime, UTC
+from datetime import datetime, timezone
 from utils.helpers import generate_unique_id
 from app.services.pdf_processing import extract_pdf_content, build_prompt, call_openai
 import os
@@ -48,7 +48,7 @@ def index():
             user = data_manager.user_manager.get_user_by_email(email)
             if user and check_password_hash(user.password_hash, password):
                 login_user(user)
-                user.last_login = datetime.now(UTC)
+                user.last_login = datetime.now(timezone.utc)
                 data_manager.user_manager.update_user(user.id, last_login=user.last_login)
                 return redirect(url_for('index'))
             else:
@@ -84,7 +84,7 @@ def register():
 
             uid = generate_unique_id()  # your helper for a 26-char ID
             pwd_hash = generate_password_hash(pwd)
-            created = datetime.now(UTC)
+            created = datetime.now(timezone.utc)
 
             data_manager.user_manager.add_user( id=uid, email=email, password_hash=pwd_hash, name=name, role=role, created_at=created)
             flash('Registration successful. Please log in.', 'success')
@@ -115,7 +115,7 @@ def upload_pdf():
         try:
             pid = generate_unique_id()
             blob = file.read()
-            now = datetime.now(UTC)
+            now = datetime.now(timezone.utc)
             data_manager.pdf_manager.add_pdf(
                 id=pid,
                 user_id=current_user.id,
@@ -166,7 +166,7 @@ def process_pdf(pdf_id):
 
         # Step 4: Save structured data
         proc_id = generate_unique_id()
-        now = datetime.now(UTC)
+        now = datetime.now(timezone.utc)
 
         # Handle list conversion if needed
         sequences = ai_response['sequences']
