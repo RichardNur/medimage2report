@@ -5,7 +5,7 @@ from data.models.models import User, db
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, UTC
 from utils.helpers import generate_unique_id
-from app.services.pdf_processing import extract_pdf_text, build_prompt, call_openai
+from app.services.pdf_processing import extract_pdf_content, build_prompt, call_openai
 import os
 from sqlalchemy.orm import Session
 
@@ -147,6 +147,9 @@ def process_pdf(pdf_id):
     """
     try:
         entry = data_manager.pdf_manager.get_pdf(pdf_id)
+
+        print(entry)
+
         if not entry or entry.user_id != current_user.id:
             abort(404)
 
@@ -159,7 +162,7 @@ def process_pdf(pdf_id):
         FIX TEXT-EXTRACTION FROM PDF!!!!
         """
 
-        text_data = extract_pdf_text(entry.raw_pdf_blob)
+        text_data = extract_pdf_content(entry.raw_pdf_blob)
 
         # Step 2: Build prompt and call OpenAI
         prompt = build_prompt(text_data)
