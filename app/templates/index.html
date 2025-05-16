@@ -36,8 +36,21 @@
         </div>
     </nav>
 
-    <!-- Login/Sign-up Section -->
-    <div class="container mt-5">
+<!-- Login or Welcome Section -->
+<div class="container mt-5">
+    {% if current_user.is_authenticated %}
+        <div class="alert alert-success text-center">
+            <h4 class="mb-3">Welcome, {{ current_user.name or current_user.email }}!</h4>
+
+            <!-- Action Buttons -->
+            <div class="d-grid gap-2 d-sm-flex justify-content-sm-center mb-3">
+                <a href="{{ url_for('upload_pdf') }}" class="btn btn-outline-primary btn-lg px-4">Medical Report Generator (PDF-Upload)</a>
+                <a href="#" class="btn btn-outline-secondary btn-lg px-4 disabled">TBC-Recognizer (DICOM-Upload)</a>
+            </div>
+
+            <a href="{{ url_for('logout') }}" class="btn btn-danger">Log Out</a>
+        </div>
+    {% else %}
         <div class="row justify-content-center">
             <div class="col-md-6">
                 <h2>Login</h2>
@@ -53,18 +66,20 @@
                     <button type="submit" class="btn btn-primary">Log In</button>
                     <a href="{{ url_for('register') }}" class="btn btn-secondary">Sign Up</a>
                 </form>
-                {% with messages = get_flashed_messages(with_categories=true) %}
-                    {% if messages %}
-                        <div class="mt-3">
-                            {% for category, message in messages %}
-                                <div class="alert alert-{{ category }}">{{ message }}</div>
-                            {% endfor %}
-                        </div>
-                    {% endif %}
-                {% endwith %}
             </div>
         </div>
-    </div>
+    {% endif %}
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="mt-3">
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+</div>
 
     <!-- About Section -->
     <div class="container mt-5">
