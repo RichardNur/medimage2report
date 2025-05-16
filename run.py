@@ -1,5 +1,5 @@
 from data.sqlite_data_manager import DataManagerInterface
-from flask import Flask, redirect, url_for, render_template, abort, request, flash, current_app
+from flask import Flask, redirect, url_for, render_template, abort, request, flash, current_app, Response
 from flask_login import login_user, logout_user, login_required, current_user, LoginManager
 from data.models.models import User, db
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -148,34 +148,36 @@ def process_pdf(pdf_id):
     try:
         entry = data_manager.pdf_manager.get_pdf(pdf_id)
 
-        print(entry)
-
         if not entry or entry.user_id != current_user.id:
             abort(404)
 
-        # Update status to "processing"
+        # Step 1: Update status to "processing"
         data_manager.pdf_manager.update_processing_status(pdf_id, 'processing')
 
-        # Step 1: Extract content from PDF
+        # Step 2: Extract OCR content
+        extracted_pdf_content: dict = extract_pdf_content(entry.raw_pdf_blob, lang="deu")
 
-        """
-        FIX TEXT-EXTRACTION FROM PDF!!!!
-        """
+        if not extracted_pdf_content:
+            raise ValueError("OCR extraction returned no usable text.")
 
-        text_data = extract_pdf_content(entry.raw_pdf_blob)
-
-        # Step 2: Build prompt and call OpenAI
-        prompt = build_prompt(text_data)
+        # Step 3: Build prompt and get OpenAI response
+        prompt = build_prompt(extracted_pdf_content)
         ai_response = call_openai(prompt)
 
-        # Step 3: Save processed result
+        # Step 4: Save structured data
         proc_id = generate_unique_id()
         now = datetime.now(UTC)
+
+        # Handle list conversion if needed
+        sequences = ai_response['sequences']
+        if isinstance(sequences, list):
+            sequences = ", ".join(sequences)
+
         data_manager.processed_manager.add_processed_data(
             id=proc_id,
             pdf_data_id=pdf_id,
             company_name=ai_response['company'],
-            sequences=ai_response['sequences'],
+            sequences=sequences,
             method_used=ai_response['method'],
             body_region=ai_response['region'],
             modality=ai_response['modality'],
@@ -185,30 +187,15 @@ def process_pdf(pdf_id):
             created_at=now
         )
 
-        # Update PDF status
+        # Step 5: Final status update
         data_manager.pdf_manager.update_processing_status(pdf_id, 'processed')
 
         return redirect(url_for('view_report', processed_id=proc_id))
 
-    except Exception:
+    except Exception as e:
         current_app.logger.exception("Processing error")
         data_manager.pdf_manager.update_processing_status(pdf_id, 'error')
         return redirect(url_for('error_log', pdf_id=pdf_id))
-
-
-@app.route('/report/<processed_id>', methods=['GET'])
-@login_required
-def view_report(processed_id):
-    try:
-        report = data_manager.processed_manager.get_processed_data(processed_id)
-        if not report or report.pdf_data.user_id != current_user.id:
-            abort(404)
-        return render_template('report.html', report=report)
-
-    except Exception:
-        current_app.logger.exception("View report error")
-        flash('Unable to load report.', 'danger')
-        return redirect(url_for('status_dashboard'))
 
 
 @app.route('/status', methods=['GET'])
@@ -221,7 +208,10 @@ def status_dashboard():
     """
     try:
         uploads   = data_manager.pdf_manager.get_pdfs_by_user(current_user.id)
-        processed = {p.pdf_data_id for p in data_manager.processed_manager.list_all()}
+        processed = {
+            p.pdf_data_id for p in data_manager.processed_manager.list_all()
+            if p.pdf_data.user_id == current_user.id
+        }
         return render_template('status.html',
                                uploads=uploads,
                                processed_ids=processed)
@@ -239,13 +229,28 @@ def error_log(pdf_id):
     - Display error logs related to a specific PDF
     """
     try:
-        errors = data_manager.errorlog_manager.get_errors_by_pdf_id(pdf_id)
-        errors = errors or []
+        errors = data_manager.errorlog_manager.get_errors_by_pdf_id(pdf_id) or []
         return render_template('errors.html', errors=errors, pdf_id=pdf_id)
     except Exception:
         current_app.logger.exception("Error log view")
         flash('Unable to load error logs.', 'danger')
         return redirect(url_for('status_dashboard'))
+
+
+@app.route('/errors/<pdf_id>/clear', methods=['POST'])
+@login_required
+def clear_errors(pdf_id):
+    """
+    Clears all error log entries for a given PDF.
+    """
+    try:
+        data_manager.errorlog_manager.clear_errors_by_pdf_id(pdf_id)
+        flash('All error logs cleared.', 'success')
+    except Exception:
+        current_app.logger.exception("Failed to clear error logs")
+        flash('Failed to clear error logs.', 'danger')
+
+    return redirect(url_for('error_log', pdf_id=pdf_id))
 
 
 @app.route('/profile', methods=['GET', 'POST'])
@@ -270,23 +275,41 @@ def profile():
     return render_template('profile.html', user=current_user)
 
 
-@app.route('/findings/<processed_id>', methods=['GET'])
+
+@app.route('/view_report/<processed_id>', methods=['GET'])
 @login_required
-def view_findings(processed_id):
+def view_report(processed_id):
     """
-    View Findings:
-    - Show detailed structured findings table
+    View AI-generated structured report (short + long version, meta info).
     """
     try:
         report = data_manager.processed_manager.get_processed_data(processed_id)
+
         if not report or report.pdf_data.user_id != current_user.id:
             abort(404)
-        findings = data_manager.finding_manager.get_findings_by_processed_id(processed_id)
-        return render_template('findings.html', findings=findings, report=report)
+
+        return render_template('view_report.html', report=report)
+
     except Exception:
-        current_app.logger.exception("View findings error")
-        flash('Unable to load findings.', 'danger')
-        return redirect(url_for('view_report', processed_id=processed_id))
+        current_app.logger.exception("View report error")
+        flash('Unable to load report.', 'danger')
+        return redirect(url_for('status_dashboard'))
+
+
+@app.route('/pdf/<pdf_id>')
+@login_required
+def serve_pdf(pdf_id):
+    """
+    Serve the original uploaded PDF as inline content in the browser.
+    """
+    entry = data_manager.pdf_manager.get_pdf(pdf_id)
+
+    if not entry or entry.user_id != current_user.id:
+        abort(404)
+
+    return Response(entry.raw_pdf_blob,
+                    mimetype='application/pdf',
+                    headers={"Content-Disposition": "inline; filename=analysis.pdf"})
 
 
 @app.route('/logout')
@@ -295,6 +318,9 @@ def logout():
     logout_user()
     flash('You have been successfully logged out.', 'info')
     return redirect(url_for('index'))
+
+
+
 
 
 if __name__ == "__main__":

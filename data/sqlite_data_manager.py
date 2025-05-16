@@ -118,7 +118,12 @@ class PDFDataManager:
             raise e
 
     def get_pdfs_by_user(self, user_id):
-        return ImageAnalysisPDF.query.filter_by(user_id=user_id).all()
+        return (
+            ImageAnalysisPDF.query
+            .filter_by(user_id=user_id)
+            .order_by(ImageAnalysisPDF.upload_date.desc())
+            .all()
+        )
 
     def get_pdf(self, pdf_id):
         return ImageAnalysisPDF.query.filter_by(id=pdf_id).first()
