@@ -200,7 +200,7 @@ def process_pdf(pdf_id):
 
 @app.route('/status', methods=['GET'])
 @login_required
-def status_dashboard():
+def status():
     """
     Status Route:
     - Show user uploads, their status (uploaded/processed/failed)
