@@ -1,6 +1,7 @@
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import Column, String, ForeignKey, Text, DateTime
 from datetime import datetime
+from sqlalchemy.orm import relationship
 
 db = SQLAlchemy()
 
@@ -22,6 +23,22 @@ class User(db.Model):
 
     def __repr__(self):
         return f'<User {self.name} ({self.email})>'
+
+    # Flask-Login required properties
+    @property
+    def is_authenticated(self):
+        return True
+
+    @property
+    def is_active(self):
+        return True
+
+    @property
+    def is_anonymous(self):
+        return False
+
+    def get_id(self):
+        return self.id
 
 
 class ImageAnalysisPDF(db.Model):
@@ -58,6 +75,9 @@ class ProcessedImageAnalysisData(db.Model):
     report_section_long = Column(Text, nullable=True)
     report_quality_score = Column(String(10), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    pdf_data = relationship("ImageAnalysisPDF", backref="processed_reports")
+
 
     def __repr__(self):
         return f'<ProcessedData {self.id}>'
