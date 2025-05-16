@@ -1,2 +1,84 @@
 <!DOCTYPE html>
-<html><body><h1>Error Log for PDF {{ pdf_id }}</h1><ul>{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul></body></html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Error Log</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+
+<!-- Navbar -->
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
+    <div class="container">
+        <a class="navbar-brand" href="{{ url_for('index') }}">medimage2report</a>
+        <div class="collapse navbar-collapse">
+            <ul class="navbar-nav me-auto">
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('status_dashboard') }}">Dashboard</a></li>
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('upload_pdf') }}">Upload</a></li>
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('logout') }}">Logout</a></li>
+            </ul>
+        </div>
+    </div>
+</nav>
+
+<!-- Title -->
+<div class="container text-center mb-4">
+    <h1 class="display-5">Error Log</h1>
+    <p class="text-muted">Review errors related to your uploaded PDF</p>
+</div>
+
+<!-- Error Table -->
+<div class="container">
+    <div class="card shadow-sm">
+        <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center">
+            <span>Errors for PDF ID: {{ pdf_id }}</span>
+            <form method="POST" action="{{ url_for('clear_errors', pdf_id=pdf_id) }}" onsubmit="return confirm('Are you sure you want to delete all error logs for this file?')">
+                <button class="btn btn-sm btn-light" type="submit">🗑️ Clear Errors</button>
+            </form>
+        </div>
+        <div class="card-body p-0">
+            {% if errors %}
+            <table class="table table-striped mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th scope="col">Timestamp</th>
+                        <th scope="col">Message</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for err in errors %}
+                    <tr>
+                        <td>{{ err.timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
+                        <td>{{ err.message }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="p-4 text-center text-muted">
+                <p>No error entries found for this PDF.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Action Links -->
+    <div class="mt-4 d-flex gap-3">
+        <a href="{{ url_for('status_dashboard') }}" class="btn btn-outline-primary">← Back to Dashboard</a>
+
+        {% if pdf_id in processed_ids %}
+            <a href="{{ url_for('view_report', processed_id=pdf_id) }}" class="btn btn-outline-success">📄 View Report</a>
+        {% else %}
+            <a href="{{ url_for('serve_pdf', pdf_id=pdf_id) }}" class="btn btn-outline-secondary">📂 View PDF</a>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Footer -->
+<footer class="bg-dark text-white text-center py-3 mt-5">
+    <small>&copy; 2025 medimage2report. All rights reserved.</small>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
