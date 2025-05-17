@@ -224,11 +224,19 @@ def error_log(pdf_id):
     """
     try:
         errors = data_manager.errorlog_manager.get_errors_by_pdf_id(pdf_id) or []
-        return render_template('errors.html', errors=errors, pdf_id=pdf_id)
+
+        # Get all processed PDF IDs for this user
+        processed = {
+            p.pdf_data_id for p in data_manager.processed_manager.list_all()
+            if p.pdf_data.user_id == current_user.id
+        }
+
+        return render_template('errors.html', errors=errors, pdf_id=pdf_id, processed_ids=processed)
+
     except Exception:
         current_app.logger.exception("Error log view")
         flash('Unable to load error logs.', 'danger')
-        return redirect(url_for('status'))
+        return redirect(url_for('status_dashboard'))
 
 
 @app.route('/errors/<pdf_id>/clear', methods=['POST'])
