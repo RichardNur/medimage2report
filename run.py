@@ -63,7 +63,7 @@ def index():
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if current_user.is_authenticated:
-        return redirect(url_for('status_dashboard'))
+        return redirect(url_for('status'))
 
     if request.method == 'POST':
         email = request.form.get('email', '').strip()
@@ -203,18 +203,12 @@ def process_pdf(pdf_id):
 def status():
     """
     Status Route:
-    - Show user uploads, their status (uploaded/processed/failed)
-    - Link to reports or error logs
+    - Show user uploads and their current processing status.
+    - Actual report content is loaded lazily on demand.
     """
     try:
-        uploads   = data_manager.pdf_manager.get_pdfs_by_user(current_user.id)
-        processed = {
-            p.pdf_data_id for p in data_manager.processed_manager.list_all()
-            if p.pdf_data.user_id == current_user.id
-        }
-        return render_template('status.html',
-                               uploads=uploads,
-                               processed_ids=processed)
+        uploads = data_manager.pdf_manager.get_pdfs_by_user(current_user.id)
+        return render_template('status.html', uploads=uploads)
     except Exception:
         current_app.logger.exception("Status error")
         flash('Could not fetch dashboard.', 'danger')
@@ -234,7 +228,7 @@ def error_log(pdf_id):
     except Exception:
         current_app.logger.exception("Error log view")
         flash('Unable to load error logs.', 'danger')
-        return redirect(url_for('status_dashboard'))
+        return redirect(url_for('status'))
 
 
 @app.route('/errors/<pdf_id>/clear', methods=['POST'])
@@ -293,7 +287,7 @@ def view_report(processed_id):
     except Exception:
         current_app.logger.exception("View report error")
         flash('Unable to load report.', 'danger')
-        return redirect(url_for('status_dashboard'))
+        return redirect(url_for('status'))
 
 
 @app.route('/pdf/<pdf_id>')
@@ -310,6 +304,26 @@ def serve_pdf(pdf_id):
     return Response(entry.raw_pdf_blob,
                     mimetype='application/pdf',
                     headers={"Content-Disposition": "inline; filename=analysis.pdf"})
+
+
+@app.route('/view_report_by_pdf/<pdf_id>', methods=['GET'])
+@login_required
+def view_report_by_pdf_id(pdf_id):
+    """
+    Lookup the processed_id by pdf_id, then redirect to view_report route.
+    """
+    try:
+        processed = data_manager.processed_manager.get_by_pdf_id(pdf_id)
+
+        if not processed or processed.pdf_data.user_id != current_user.id:
+            abort(404)
+
+        return redirect(url_for('view_report', processed_id=processed.id))
+
+    except Exception:
+        current_app.logger.exception("Redirecting to view_report failed")
+        flash('Unable to load report.', 'danger')
+        return redirect(url_for('status'))
 
 
 @app.route('/logout')

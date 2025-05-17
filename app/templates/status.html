@@ -13,7 +13,7 @@
         <a class="navbar-brand" href="{{ url_for('index') }}">medimage2report</a>
         <div class="collapse navbar-collapse">
             <ul class="navbar-nav me-auto">
-                <li class="nav-item"><a class="nav-link active" href="{{ url_for('status_dashboard') }}">Dashboard</a></li>
+                <li class="nav-item"><a class="nav-link active" href="{{ url_for('status') }}">Dashboard</a></li>
                 <li class="nav-item"><a class="nav-link" href="{{ url_for('upload_pdf') }}">Upload</a></li>
                 <li class="nav-item"><a class="nav-link" href="{{ url_for('logout') }}">Logout</a></li>
             </ul>
@@ -59,15 +59,19 @@
                                 <span class="badge bg-secondary">Uploaded</span>
                             {% endif %}
                         </td>
+
                         <td class="text-center">
-                            {% if file.id in processed_ids %}
-                                <a href="{{ url_for('view_report', processed_id=file.id) }}" class="btn btn-sm btn-outline-primary">View Report</a>
-                            {% elif file.processing_status == 'error' %}
-                                <a href="{{ url_for('error_log', pdf_id=file.id) }}" class="btn btn-sm btn-outline-danger">View Error</a>
-                            {% else %}
-                                <span class="text-muted">–</span>
-                            {% endif %}
-                        </td>
+    {% if file.processing_status == 'processed' %}
+        <form method="GET" action="{{ url_for('view_report_by_pdf_id', pdf_id=file.id) }}">
+            <button type="submit" class="btn btn-sm btn-outline-primary">View Report</button>
+        </form>
+    {% elif file.processing_status == 'error' %}
+        <a href="{{ url_for('error_log', pdf_id=file.id) }}" class="btn btn-sm btn-outline-danger">View Error</a>
+    {% else %}
+        <span class="text-muted">–</span>
+    {% endif %}
+</td>
+
                     </tr>
                     {% else %}
                     <tr>

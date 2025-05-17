@@ -203,6 +203,14 @@ class ProcessedDataManager:
         """
         return ProcessedImageAnalysisData.query.all()
 
+    def get_by_pdf_id(self, pdf_id):
+        """
+        Return the first processed report matching the given PDF ID.
+        Assumes a 1:1 relationship between PDF and processed report.
+        """
+        return ProcessedImageAnalysisData.query.filter_by(pdf_data_id=pdf_id).first()
+
+
 
 
 class FindingDataManager:
