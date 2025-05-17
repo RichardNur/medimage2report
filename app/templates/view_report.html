@@ -1,117 +1,133 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Generated Medical Report</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-        @media print {
-            .no-print {
-                display: none;
-            }
-        }
-    </style>
+  <meta charset="UTF-8">
+  <title>Generated Report – medimage2report</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body {
+      background-color: #f4f9fc;
+    }
+    @media print {
+      .no-print {
+        display: none;
+      }
+    }
+    .btn-copy {
+      background: #ffffff;
+      border: 1px solid #ccc;
+      font-size: 0.875rem;
+    }
+    iframe {
+      border: 1px solid #ccc;
+      border-radius: 6px;
+    }
+  </style>
 </head>
-<body class="bg-light">
+<body>
+
+<!-- Gradient Header -->
+<header class="py-5 text-white text-center no-print" style="background: linear-gradient(135deg, #0d6efd, #0dcaf0);">
+  <div class="container">
+    <h1 class="display-5 fw-bold">AI-Generated Medical Report</h1>
+    <p class="lead">From PDF image analysis to structured RSNA reporting</p>
+  </div>
+</header>
 
 <!-- Navbar -->
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 no-print">
-    <div class="container">
-        <a class="navbar-brand" href="{{ url_for('index') }}">medimage2report</a>
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-            <span class="navbar-toggler-icon"></span>
-        </button>
-        <div class="collapse navbar-collapse" id="navbarNav">
-            <ul class="navbar-nav me-auto">
-                <li class="nav-item"><a class="nav-link" href="{{ url_for('status') }}">Dashboard</a></li>
-                <li class="nav-item"><a class="nav-link" href="{{ url_for('upload_pdf') }}">Upload</a></li>
-                <li class="nav-item"><a class="nav-link" href="{{ url_for('logout') }}">Logout</a></li>
-            </ul>
-        </div>
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark no-print">
+  <div class="container">
+    <a class="navbar-brand" href="{{ url_for('index') }}">medimage2report</a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navbarNav">
+      <ul class="navbar-nav me-auto">
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('status') }}">Dashboard</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('upload_pdf') }}">Upload</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('logout') }}">Logout</a></li>
+      </ul>
     </div>
+  </div>
 </nav>
-
-<!-- Title -->
-<div class="container text-center mt-4">
-    <h1 class="display-4">medimage2report</h1>
-    <p class="lead">From medical image to RSNA-conform report in seconds</p>
-</div>
 
 <!-- PDF Preview -->
 <div class="container mt-4">
-    <div class="card mb-4">
-        <div class="card-header bg-info text-white">Original PDF Preview</div>
-        <div class="card-body">
-            <iframe src="{{ url_for('serve_pdf', pdf_id=report.pdf_data_id) }}#zoom=50"
-                    width="100%" height="400px"
-                    style="border: 1px solid #ccc; border-radius: 5px;">
-            </iframe>
-        </div>
+  <div class="card mb-4 shadow-sm">
+    <div class="card-header bg-info text-white">Original PDF Preview</div>
+    <div class="card-body">
+      <iframe src="{{ url_for('serve_pdf', pdf_id=report.pdf_data_id) }}#zoom=50"
+              width="100%" height="450px">
+      </iframe>
     </div>
+  </div>
 </div>
 
-<!-- Report Section -->
+<!-- AI Summary Sections -->
 <div class="container">
-    <div class="text-center mb-4">
-        <h2>Generated Report</h2>
-        <p class="text-muted">AI-generated medical summary based on your uploaded image analysis</p>
-    </div>
+  <div class="text-center mb-4">
+    <h2>Structured AI Report</h2>
+    <p class="text-muted">Quick summary and detailed narrative created from AI-extracted findings</p>
+  </div>
 
-    <div class="card mb-3">
-        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-            <span>Quick Summary</span>
-            <button class="btn btn-sm btn-light no-print" onclick="copyText('quickText')">📋 Copy</button>
-        </div>
-        <div class="card-body">
-            <p id="quickText">{{ report.report_section_short }}</p>
-        </div>
+  <!-- Short Summary -->
+  <div class="card mb-3 shadow-sm">
+    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+      <span>Quick Summary</span>
+      <button class="btn btn-sm btn-copy no-print" onclick="copyText('quickText')">📋 Copy</button>
     </div>
+    <div class="card-body">
+      <p id="quickText">{{ report.report_section_short }}</p>
+    </div>
+  </div>
 
-    <div class="card mb-3">
-        <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
-            <span>Detailed Report</span>
-            <button class="btn btn-sm btn-light no-print" onclick="copyText('reportText')">📋 Copy</button>
-        </div>
-        <div class="card-body">
-            <pre id="reportText" style="white-space: pre-wrap;">{{ report.report_section_long }}</pre>
-        </div>
+  <!-- Long Summary -->
+  <div class="card mb-3 shadow-sm">
+    <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
+      <span>Detailed Report</span>
+      <button class="btn btn-sm btn-copy no-print" onclick="copyText('reportText')">📋 Copy</button>
     </div>
+    <div class="card-body">
+      <pre id="reportText" style="white-space: pre-wrap;">{{ report.report_section_long }}</pre>
+    </div>
+  </div>
 
-    <div class="row">
-        <div class="col-md-6">
-            <h5>Meta Information</h5>
-            <ul class="list-group">
-                <li class="list-group-item"><strong>Company:</strong> {{ report.company_name }}</li>
-                <li class="list-group-item"><strong>Method:</strong> {{ report.method_used }}</li>
-                <li class="list-group-item"><strong>Region:</strong> {{ report.body_region }}</li>
-                <li class="list-group-item"><strong>Modality:</strong> {{ report.modality }}</li>
-                <li class="list-group-item"><strong>Sequences:</strong> {{ report.sequences }}</li>
-                <li class="list-group-item"><strong>Quality Score:</strong> {{ report.report_quality_score }}</li>
-                <li class="list-group-item"><strong>Created:</strong> {{ report.created_at.strftime('%Y-%m-%d %H:%M') }}</li>
-            </ul>
-        </div>
+  <!-- Meta Information -->
+  <div class="row">
+    <div class="col-md-6">
+      <h5>Meta Information</h5>
+      <ul class="list-group">
+        <li class="list-group-item"><strong>Company:</strong> {{ report.company_name }}</li>
+        <li class="list-group-item"><strong>Method:</strong> {{ report.method_used }}</li>
+        <li class="list-group-item"><strong>Region:</strong> {{ report.body_region }}</li>
+        <li class="list-group-item"><strong>Modality:</strong> {{ report.modality }}</li>
+        <li class="list-group-item"><strong>Sequences:</strong> {{ report.sequences }}</li>
+        <li class="list-group-item"><strong>Quality Score:</strong> {{ report.report_quality_score }}</li>
+        <li class="list-group-item"><strong>Created:</strong> {{ report.created_at.strftime('%Y-%m-%d %H:%M') }}</li>
+      </ul>
     </div>
+  </div>
 
-    <div class="mt-4 no-print">
-        <a href="{{ url_for('status') }}" class="btn btn-outline-primary">← Back to Dashboard</a>
-    </div>
+  <div class="mt-4 no-print">
+    <a href="{{ url_for('status') }}" class="btn btn-outline-primary">← Back to Dashboard</a>
+  </div>
 </div>
 
 <!-- Footer -->
 <footer class="bg-dark text-white text-center py-3 mt-5">
-    <small>&copy; 2025 medimage2report. All rights reserved.</small>
+  <small>&copy; 2025 medimage2report. All rights reserved. Version 1.0</small>
 </footer>
 
-<!-- Scripts -->
 <script>
-    function copyText(elementId) {
-        const text = document.getElementById(elementId).innerText;
-        navigator.clipboard.writeText(text).then(() => {
-            alert('Copied to clipboard');
-        }, () => {
-            alert('Copy failed');
-        });
-    }
+  function copyText(elementId) {
+    const text = document.getElementById(elementId).innerText;
+    navigator.clipboard.writeText(text).then(() => {
+      alert('Copied to clipboard');
+    }).catch(() => {
+      alert('Copy failed');
+    });
+  }
 </script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
