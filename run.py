@@ -8,8 +8,9 @@ from utils.helpers import generate_unique_id
 from app.services.pdf_processing import extract_pdf_content, build_prompt, call_openai
 import os
 from sqlalchemy.orm import Session
+from dotenv import load_dotenv
 
-
+load_dotenv()
 
 # Set base paths
 base_dir = os.path.abspath(os.path.dirname(__file__))
@@ -22,6 +23,7 @@ os.makedirs(os.path.dirname(db_file_name), exist_ok=True)
 
 # Initialize Flask app
 app = Flask(__name__, template_folder=template_dir, static_folder=static_dir)
+app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024  # 10 MB max upload size
 
 # Initialize Data Manager
 data_manager = DataManagerInterface(db_file_name, app)
