@@ -164,7 +164,13 @@ def process_pdf(pdf_id):
 
         # Step 3: Build prompt and get OpenAI response
         prompt = build_prompt(extracted_pdf_content)
-        ai_response = call_openai(prompt)
+
+        try:
+            ai_response = call_openai(prompt)
+        except Exception as e:
+            current_app.logger.exception("OpenAI call failed")
+            flash("AI processing failed. Try again later.", "danger")
+            return redirect(url_for('status'))
 
         # Step 4: Save structured data
         proc_id = generate_unique_id()
@@ -238,7 +244,7 @@ def error_log(pdf_id):
     except Exception:
         current_app.logger.exception("Error log view")
         flash('Unable to load error logs.', 'danger')
-        return redirect(url_for('status_dashboard'))
+        return redirect(url_for('status'))
 
 
 @app.route('/errors/<pdf_id>/clear', methods=['POST'])
