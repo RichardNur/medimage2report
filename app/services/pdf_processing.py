@@ -97,7 +97,7 @@ def build_prompt(structured_data: dict) -> str:
         "**Instructions:**\n"
         "- Provide two descriptions: a short version (for the physician’s report) and a long version (simplified for the patient)."
         "- The short text is for implementing into the radiological report, within the description section. Make sure"
-        "to mention the company, method and sequence for comprehensiveness.\n"
+        "to mention the company, method, sequence and especially findings for comprehensiveness. If there are references like image number, also mention these.\n"
         "- Only fill fields if you are confident. If unsure, leave the field out.\n"
         "- Return ONLY valid JSON in the following structure:\n\n"
         "```json\n"
