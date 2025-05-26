@@ -141,7 +141,7 @@ def upload_pdf():
 def process_pdf(pdf_id):
     """
     Process Route:
-    - Triggered by redirect from /upload (GET)
+    - Triggered by redirect from /upload (rGET)
     - Extract content from uploaded PDF
     - Build prompt and call OpenAI
     - Store the processed output
