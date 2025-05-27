@@ -3,22 +3,17 @@ import os
 import json
 from dotenv import load_dotenv
 import logging
-
 import fitz
 import pytesseract
 import io
 import re
 from PIL import Image, ImageOps, ImageFilter, ImageEnhance
 
-
 # Load the environment variable from .env file
 load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # Explicit Path to tesseract (homebrew)
-pytesseract.pytesseract.tesseract_cmd = "/opt/homebrew/bin/tesseract"
-
-# Set explicit path to Tesseract (Mac Homebrew)
 pytesseract.pytesseract.tesseract_cmd = "/opt/homebrew/bin/tesseract"
 
 
