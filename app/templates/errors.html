@@ -33,7 +33,7 @@
     </button>
     <div class="collapse navbar-collapse" id="navbarNav">
       <ul class="navbar-nav me-auto">
-        <li class="nav-item"><a class="nav-link" href="{{ url_for('status_dashboard') }}">Dashboard</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('status') }}">Dashboard</a></li>
         <li class="nav-item"><a class="nav-link" href="{{ url_for('upload_pdf') }}">Upload</a></li>
         <li class="nav-item"><a class="nav-link" href="{{ url_for('logout') }}">Logout</a></li>
       </ul>
@@ -80,7 +80,7 @@
 
   <!-- Navigation Buttons -->
   <div class="d-flex flex-wrap gap-3">
-    <a href="{{ url_for('status_dashboard') }}" class="btn btn-outline-primary">← Back to Dashboard</a>
+    <a href="{{ url_for('status') }}" class="btn btn-outline-primary">← Back to Dashboard</a>
 
     {% if pdf_id in processed_ids %}
       <a href="{{ url_for('view_report', processed_id=pdf_id) }}" class="btn btn-outline-success">📄 View Report</a>

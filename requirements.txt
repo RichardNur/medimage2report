@@ -6,3 +6,4 @@ SQLAlchemy~=2.0.38
 Flask-Login~=0.6.3
 Flask~=3.1.0
 Werkzeug~=3.1.3
+docling~=2.32.0
