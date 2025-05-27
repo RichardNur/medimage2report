@@ -158,7 +158,6 @@ def process_pdf(pdf_id):
 
         # Step 2: Extract OCR content
         extracted_pdf_content: dict = extract_pdf_content(entry.raw_pdf_blob, lang="deu")
-
         if not extracted_pdf_content:
             raise ValueError("OCR extraction returned no usable text.")
 
