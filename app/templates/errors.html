@@ -58,6 +58,7 @@
           <thead class="table-light">
             <tr>
               <th scope="col">Timestamp</th>
+              <th scope="col">Type</th>
               <th scope="col">Message</th>
             </tr>
           </thead>
@@ -65,7 +66,8 @@
             {% for err in errors %}
               <tr>
                 <td>{{ err.timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
-                <td>{{ err.message }}</td>
+                <td>{{ err.error_type }}</td>
+                <td>{{ err.error_message }}</td>
               </tr>
             {% endfor %}
           </tbody>
