@@ -1,6 +1,6 @@
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import Column, String, ForeignKey, Text, DateTime
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.orm import relationship
 
 db = SQLAlchemy()
@@ -50,7 +50,7 @@ class ImageAnalysisPDF(db.Model):
     id = Column(String(26), primary_key=True)
     user_id = Column(String(26), ForeignKey('USERS.id'), nullable=False)
     original_filename = Column(String(255), nullable=False)
-    upload_date = Column(DateTime, default=datetime.utcnow, nullable=False)
+    upload_date = Column(DateTime, default=datetime.now(timezone.utc), nullable=False)
     raw_pdf_blob = Column(Text, nullable=True)  # Can be switched to LargeBinary for raw bytes
     processing_status = Column(String(100), nullable=True)
 
@@ -74,7 +74,7 @@ class ProcessedImageAnalysisData(db.Model):
     report_section_short = Column(Text, nullable=True)
     report_section_long = Column(Text, nullable=True)
     report_quality_score = Column(String(10), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=datetime.now(timezone.utc), nullable=False)
 
     pdf_data = relationship("ImageAnalysisPDF", backref="processed_reports")
 
@@ -111,7 +111,7 @@ class ErrorLog(db.Model):
     pdf_data_id = Column(String(26), ForeignKey('PDF_IMAGE_ANALYSIS_DATA.id'), nullable=False)
     error_type = Column(String(100), nullable=False)
     error_message = Column(Text, nullable=False)
-    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False)
+    timestamp = Column(DateTime, default=datetime.now(timezone.utc), nullable=False)
 
     def __repr__(self):
         return f'<ErrorLog {self.error_type} at {self.timestamp}>'
