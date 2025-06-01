@@ -65,13 +65,12 @@ def _log_pdf_error(pdf_id: str, exc: Exception):
         # If logging itself fails, write to the main app logger
         logging.exception("Failed to write to ERROR_LOGS: %s", db_err)
 
-    # finally, attempt to mark the PDF itself as errored
+    # finally, attempt e mark the PDF itself as errored
     try:
         data_manager.pdf_manager.update_processing_status(pdf_id, 'error')
     except Exception:
         # swallow, there's nothing more we can do
         pass
-
 
 # -----------------------------------------------------------------------------
 # User‐loader for Flask‐Login
