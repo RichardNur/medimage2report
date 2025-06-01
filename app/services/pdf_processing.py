@@ -8,6 +8,7 @@ import pytesseract
 import io
 import re
 from PIL import Image, ImageOps, ImageFilter, ImageEnhance
+from pytesseract import TesseractError
 
 # Load the environment variable from .env file
 load_dotenv()
