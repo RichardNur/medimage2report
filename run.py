@@ -1,50 +1,102 @@
-from data.sqlite_data_manager import DataManagerInterface
-from flask import Flask, redirect, url_for, render_template, abort, request, flash, current_app, Response
-from flask_login import login_user, logout_user, login_required, current_user, LoginManager
-from data.models.models import User, db
-from werkzeug.security import generate_password_hash, check_password_hash
+import logging
+import os
 from datetime import datetime, timezone
+
+from dotenv import load_dotenv
+from flask import Flask, redirect, url_for, render_template, abort, request, flash, current_app, Response
+from flask_login import LoginManager, login_user, logout_user, login_required, current_user
+from werkzeug.security import generate_password_hash, check_password_hash
+
+from data.models.models import User, ErrorLog, db
+from data.sqlite_data_manager import DataManagerInterface
 from utils.helpers import generate_unique_id
 from app.services.pdf_processing import extract_pdf_content, build_prompt, call_openai
-import os
-from sqlalchemy.orm import Session
-from dotenv import load_dotenv
 
+
+# Load .env as early as possible
 load_dotenv()
 
-# Set base paths
-base_dir = os.path.abspath(os.path.dirname(__file__))
+# -----------------------------------------------------------------------------
+# App configuration & initialization
+# -----------------------------------------------------------------------------
+base_dir     = os.path.abspath(os.path.dirname(__file__))
 template_dir = os.path.join(base_dir, 'app', 'templates')
-static_dir = os.path.join(base_dir, 'app', 'static')
-db_file_name = os.path.join(base_dir, 'data', 'medimage2report.db')
+static_dir   = os.path.join(base_dir, 'app', 'static')
+db_file      = os.path.join(base_dir, 'data', 'medimage2report.db')
 
-# Ensure data/ directory exists
-os.makedirs(os.path.dirname(db_file_name), exist_ok=True)
+# ensure data dir
+os.makedirs(os.path.dirname(db_file), exist_ok=True)
 
-# Initialize Flask app
 app = Flask(__name__, template_folder=template_dir, static_folder=static_dir)
-app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024  # 10 MB max upload size
+app.config.update({
+    'MAX_CONTENT_LENGTH': 10 * 1024 * 1024,      # 10 MB
+    'SQLALCHEMY_DATABASE_URI': f'sqlite:///{db_file}',
+    'SQLALCHEMY_TRACK_MODIFICATIONS': False,
+    'SECRET_KEY': os.getenv('FLASK_SECRET_KEY', generate_unique_id()),  # fallback if unset
+})
 
 # Initialize Data Manager
-data_manager = DataManagerInterface(db_file_name, app)
+data_manager = DataManagerInterface(db_file, app)
 
-# Handle Login
+# Set up Flask-Login
 login_manager = LoginManager()
 login_manager.init_app(app)
+login_manager.login_view = 'index'  # or 'login'
 
+
+# -----------------------------------------------------------------------------
+# Error‐logging helper
+# -----------------------------------------------------------------------------
+def _log_pdf_error(pdf_id: str, exc: Exception):
+    """
+    Persist an entry in ERROR_LOGS for this PDF and mark its status 'error'.
+    """
+    try:
+        err = ErrorLog(
+            id=generate_unique_id(),
+            pdf_data_id=pdf_id,
+            error_type=type(exc).__name__,
+            error_message=str(exc),
+            timestamp=datetime.now(timezone.utc)
+        )
+        db.session.add(err)
+        db.session.commit()
+    except Exception as db_err:
+        # If logging itself fails, write to the main app logger
+        logging.exception("Failed to write to ERROR_LOGS: %s", db_err)
+
+    # finally, attempt to mark the PDF itself as errored
+    try:
+        data_manager.pdf_manager.update_processing_status(pdf_id, 'error')
+    except Exception:
+        # swallow, there's nothing more we can do
+        pass
+
+
+# -----------------------------------------------------------------------------
+# User‐loader for Flask‐Login
+# -----------------------------------------------------------------------------
 @login_manager.user_loader
-def load_user(user_id):
+def load_user(user_id: str) -> User | None:
     with app.app_context():
-        session: Session = db.session
-        return session.get(User, user_id)
+        return db.session.get(User, user_id)
 
 
+# -----------------------------------------------------------------------------
+# Routes
+# -----------------------------------------------------------------------------
 @app.route('/', methods=['GET', 'POST'])
 def index():
-    # Handle login form on home page
+    """
+    Login page & handler.
+    """
     if request.method == 'POST':
-        email = request.form.get('email', '').strip()
-        password = request.form.get('password', '')
+        email    = (request.form.get('email') or '').strip()
+        password = request.form.get('password') or ''
+
+        if not email or not password:
+            flash('Email and password are required.', 'warning')
+            return render_template('index.html')
 
         try:
             user = data_manager.user_manager.get_user_by_email(email)
@@ -52,49 +104,63 @@ def index():
                 login_user(user)
                 user.last_login = datetime.now(timezone.utc)
                 data_manager.user_manager.update_user(user.id, last_login=user.last_login)
-                return redirect(url_for('index'))
+                return redirect(url_for('status'))
             else:
-                flash('Invalid credentials', 'danger')
+                flash('Invalid email or password.', 'danger')
         except Exception as e:
-            current_app.logger.exception("Login error: %s", str(e))
-            flash('An error occurred. Please try again later.', 'danger')
+            current_app.logger.exception("Login error")
+            flash('An internal error occurred. Please try again later.', 'danger')
 
     return render_template('index.html')
 
-
 @app.route('/register', methods=['GET', 'POST'])
 def register():
+    """
+    Registration Route:
+    - Show registration form (GET)
+    - Handle new user signup (POST)
+    """
+    # If already logged in, send the user to their dashboard
     if current_user.is_authenticated:
         return redirect(url_for('status'))
 
     if request.method == 'POST':
-        email = request.form.get('email', '').strip()
-        name  = request.form.get('name', '').strip()
-        pwd   = request.form.get('password', '')
+        email = (request.form.get('email') or '').strip()
+        name  = (request.form.get('name')  or '').strip()
+        pwd   = request.form.get('password') or ''
         role  = 'user'
 
         # Basic validation
         if not email or not pwd:
             flash('Email and password are required.', 'warning')
-            return render_template('register.html')
+            return render_template('register.html', email=email, name=name)
 
         try:
-            # check for existing user
+            # Prevent duplicate registrations
             if data_manager.user_manager.get_user_by_email(email):
-                flash('Email already registered.', 'warning')
-                return render_template('register.html')
+                flash('That email is already registered.', 'warning')
+                return render_template('register.html', email=email, name=name)
 
-            uid = generate_unique_id()  # your helper for a 26-char ID
-            pwd_hash = generate_password_hash(pwd)
-            created = datetime.now(timezone.utc)
+            uid       = generate_unique_id()
+            pwd_hash  = generate_password_hash(pwd)
+            created   = datetime.now(timezone.utc)
 
-            data_manager.user_manager.add_user( id=uid, email=email, password_hash=pwd_hash, name=name, role=role, created_at=created)
-            flash('Registration successful. Please log in.', 'success')
+            data_manager.user_manager.add_user(
+                id=uid,
+                email=email,
+                password_hash=pwd_hash,
+                name=name,
+                role=role,
+                created_at=created
+            )
+
+            flash('Registration successful! Please log in.', 'success')
             return redirect(url_for('index'))
 
-        except Exception:
+        except Exception as e:
             current_app.logger.exception("Registration error")
-            flash('Registration failed. Please try again later.', 'danger')
+            flash('An internal error occurred. Please try again later.', 'danger')
+            # fall through to re-render form
 
     return render_template('register.html')
 
@@ -104,35 +170,42 @@ def register():
 def upload_pdf():
     """
     Upload Route:
-    - Display drag-and-drop interface
-    - Accept PDF file (POST)
-    - Save to PDF_IMAGE_ANALYSIS_DATA
-    - Redirect to request.url
+    - GET:  Render drag-and-drop PDF upload form
+    - POST: Validate & save uploaded PDF, then kick off processing
     """
     if request.method == 'POST':
-        file = request.files.get('pdf_file')
-        if not file or not file.filename.lower().endswith('.pdf'):
-            flash('Please upload a PDF file.', 'warning')
-            return redirect(request.url)
+        uploaded_file = request.files.get('pdf_file')
+
+        # Validate presence and extension
+        if not uploaded_file or not uploaded_file.filename.lower().endswith('.pdf'):
+            flash('Please select a valid PDF file to upload.', 'warning')
+            return render_template('upload_pdf.html')
+
+        blob = uploaded_file.read()
+        if not blob:
+            flash('Uploaded file appears to be empty.', 'warning')
+            return render_template('upload_pdf.html')
+
+        pid = generate_unique_id()
+        now = datetime.now(timezone.utc)
+
         try:
-            pid = generate_unique_id()
-            blob = file.read()
-            now = datetime.now(timezone.utc)
             data_manager.pdf_manager.add_pdf(
                 id=pid,
                 user_id=current_user.id,
-                original_filename=file.filename,
+                original_filename=uploaded_file.filename,
                 upload_date=now,
                 raw_pdf_blob=blob,
                 processing_status='uploaded'
             )
             return redirect(url_for('process_pdf', pdf_id=pid))
 
-        except Exception:
+        except Exception as e:
             current_app.logger.exception("Upload error")
-            flash('Upload failed. Try again.', 'danger')
-            return redirect(request.url)
+            flash('Failed to save PDF. Please try again later.', 'danger')
+            return render_template('upload_pdf.html')
 
+    # GET request
     return render_template('upload_pdf.html')
 
 
@@ -141,7 +214,7 @@ def upload_pdf():
 def process_pdf(pdf_id):
     """
     Process Route:
-    - Triggered by redirect from /upload (rGET)
+    - Triggered after upload
     - Extract content from uploaded PDF
     - Build prompt and call OpenAI
     - Store the processed output
@@ -149,60 +222,57 @@ def process_pdf(pdf_id):
     """
     try:
         entry = data_manager.pdf_manager.get_pdf(pdf_id)
-
         if not entry or entry.user_id != current_user.id:
             abort(404)
 
-        # Step 1: Update status to "processing"
+        # 1) mark as processing
         data_manager.pdf_manager.update_processing_status(pdf_id, 'processing')
 
-        # Step 2: Extract OCR content
-        extracted_pdf_content: dict = extract_pdf_content(entry.raw_pdf_blob, lang="deu")
-        if not extracted_pdf_content:
-            raise ValueError("OCR extraction returned no usable text.")
+        # 2) extract text
+        extracted = extract_pdf_content(entry.raw_pdf_blob, lang="deu")
+        if not extracted or not extracted.get('raw_text'):
+            raise ValueError("No usable text extracted from PDF.")
 
-        # Step 3: Build prompt and get OpenAI response
-        prompt = build_prompt(extracted_pdf_content)
+        # 3) build prompt & call GPT
+        prompt = build_prompt(extracted)
+        ai_response = call_openai(prompt)
 
-        try:
-            ai_response = call_openai(prompt)
-        except Exception as e:
-            current_app.logger.exception("OpenAI call failed")
-            flash("AI processing failed. Try again later.", "danger")
-            return redirect(url_for('status'))
-
-        # Step 4: Save structured data
+        # 4) persist AI output
         proc_id = generate_unique_id()
         now = datetime.now(timezone.utc)
-
-        # Handle list conversion if needed
-        sequences = ai_response['sequences']
+        sequences = ai_response.get('sequences', [])
         if isinstance(sequences, list):
             sequences = ", ".join(sequences)
 
         data_manager.processed_manager.add_processed_data(
             id=proc_id,
             pdf_data_id=pdf_id,
-            company_name=ai_response['company'],
-            sequences=sequences,
-            method_used=ai_response['method'],
-            body_region=ai_response['region'],
-            modality=ai_response['modality'],
-            report_section_short=ai_response['short_text'],
-            report_section_long=ai_response['long_text'],
-            report_quality_score=ai_response['quality'],
+            company_name   = ai_response.get('company'),
+            sequences      = sequences,
+            method_used    = ai_response.get('method'),
+            body_region    = ai_response.get('region'),
+            modality       = ai_response.get('modality'),
+            report_section_short = ai_response.get('short_text'),
+            report_section_long  = ai_response.get('long_text'),
+            report_quality_score = ai_response.get('quality'),
             created_at=now
         )
 
-        # Step 5: Final status update
+        # 5) mark as done
         data_manager.pdf_manager.update_processing_status(pdf_id, 'processed')
-
         return redirect(url_for('view_report', processed_id=proc_id))
 
-    except Exception as e:
-        current_app.logger.exception("Processing error")
-        data_manager.pdf_manager.update_processing_status(pdf_id, 'error')
+    except Exception as exc:
+        # 1) log full traceback
+        current_app.logger.exception("Processing error on PDF %s", pdf_id)
+
+        # 2) persist error + update status
+        _log_pdf_error(pdf_id, exc)
+
+        # 3) send user to the error‐view
+        flash("An error occurred during processing. See error log for details.", "warning")
         return redirect(url_for('error_log', pdf_id=pdf_id))
+
 
 
 @app.route('/status', methods=['GET'])
@@ -210,16 +280,16 @@ def process_pdf(pdf_id):
 def status():
     """
     Status Route:
-    - Show user uploads and their current processing status.
-    - Actual report content is loaded lazily on demand.
+    - Show current user’s uploads and their processing status.
+    - Report links load on demand; errors are accessible separately.
     """
     try:
         uploads = data_manager.pdf_manager.get_pdfs_by_user(current_user.id)
-        return render_template('status.html', uploads=uploads)
-    except Exception:
-        current_app.logger.exception("Status error")
-        flash('Could not fetch dashboard.', 'danger')
-        return render_template('status.html', uploads=[])
+    except Exception as e:
+        current_app.logger.exception("Status error: %s", e)
+        flash('Could not load your uploads. Please try again later.', 'danger')
+        uploads = []
+    return render_template('status.html', uploads=uploads)
 
 
 @app.route('/errors/<pdf_id>', methods=['GET'])
@@ -227,22 +297,31 @@ def status():
 def error_log(pdf_id):
     """
     Error View Route:
-    - Display error logs related to a specific PDF
+    - Show processing errors for a given PDF.
+    - If the PDF does not belong to the current user, return 404.
     """
+    # Verify ownership
+    entry = data_manager.pdf_manager.get_pdf(pdf_id)
+    if not entry or entry.user_id != current_user.id:
+        abort(404)
+
     try:
         errors = data_manager.errorlog_manager.get_errors_by_pdf_id(pdf_id) or []
-
-        # Get all processed PDF IDs for this user
-        processed = {
-            p.pdf_data_id for p in data_manager.processed_manager.list_all()
-            if p.pdf_data.user_id == current_user.id
+        # Determine whether a report exists for this PDF
+        processed_ids = {
+            proc.pdf_data_id
+            for proc in data_manager.processed_manager.list_all()
+            if proc.pdf_data.user_id == current_user.id
         }
-
-        return render_template('errors.html', errors=errors, pdf_id=pdf_id, processed_ids=processed)
-
-    except Exception:
-        current_app.logger.exception("Error log view")
-        flash('Unable to load error logs.', 'danger')
+        return render_template(
+            'errors.html',
+            errors=errors,
+            pdf_id=pdf_id,
+            processed_ids=processed_ids
+        )
+    except Exception as e:
+        current_app.logger.exception("Error log view failed: %s", e)
+        flash('Unable to load error log. Please try again later.', 'danger')
         return redirect(url_for('status'))
 
 
@@ -250,23 +329,33 @@ def error_log(pdf_id):
 @login_required
 def clear_errors(pdf_id):
     """
-    Clears all error log entries for a given PDF.
+    Clears all error log entries for the specified PDF,
+    then reloads the error-log view.
     """
+    # Verify ownership
+    entry = data_manager.pdf_manager.get_pdf(pdf_id)
+    if not entry or entry.user_id != current_user.id:
+        abort(404)
+
     try:
         data_manager.errorlog_manager.clear_errors_by_pdf_id(pdf_id)
-        flash('All error logs cleared.', 'success')
-    except Exception:
-        current_app.logger.exception("Failed to clear error logs")
-        flash('Failed to clear error logs.', 'danger')
+        flash('All error logs cleared successfully.', 'success')
+    except Exception as e:
+        current_app.logger.exception("Failed to clear error logs: %s", e)
+        flash('Could not clear error logs. Please try again.', 'danger')
 
     return redirect(url_for('error_log', pdf_id=pdf_id))
-
 
 @app.route('/profile', methods=['GET', 'POST'])
 @login_required
 def profile():
+    """
+    Profile Route:
+    - GET: Show current user's profile form
+    - POST: Update name and/or password
+    """
     if request.method == 'POST':
-        name = request.form.get('name', '').strip() #email?
+        name = request.form.get('name', '').strip()
         pwd  = request.form.get('password', '')
         try:
             updates = {}
@@ -275,33 +364,36 @@ def profile():
             if pwd:
                 updates['password_hash'] = generate_password_hash(pwd)
             if updates:
-                data_manager.user_manager.update_user(current_user.id, **updates)
-                flash('Profile updated.', 'success')
+                updated = data_manager.user_manager.update_user(current_user.id, **updates)
+                if updated:
+                    flash('Profile updated successfully.', 'success')
+                else:
+                    flash('No changes were applied.', 'info')
             return redirect(url_for('profile'))
-        except Exception:
-            current_app.logger.exception("Profile update error")
-            flash('Update failed.', 'danger')
-    return render_template('profile.html', user=current_user)
+        except Exception as e:
+            current_app.logger.exception("Profile update error: %s", e)
+            flash('Could not update profile. Please try again later.', 'danger')
+            return redirect(url_for('profile'))
 
+    return render_template('profile.html', user=current_user)
 
 
 @app.route('/view_report/<processed_id>', methods=['GET'])
 @login_required
 def view_report(processed_id):
     """
-    View AI-generated structured report (short + long version, meta info).
+    View Route:
+    - Display the AI-generated structured report (short + long, meta info).
     """
     try:
         report = data_manager.processed_manager.get_processed_data(processed_id)
-
+        # Ownership check
         if not report or report.pdf_data.user_id != current_user.id:
             abort(404)
-
         return render_template('view_report.html', report=report)
-
-    except Exception:
-        current_app.logger.exception("View report error")
-        flash('Unable to load report.', 'danger')
+    except Exception as e:
+        current_app.logger.exception("View report error: %s", e)
+        flash('Unable to load the report. Please try again later.', 'danger')
         return redirect(url_for('status'))
 
 
@@ -309,111 +401,58 @@ def view_report(processed_id):
 @login_required
 def serve_pdf(pdf_id):
     """
-    Serve the original uploaded PDF as inline content in the browser.
+    PDF Serve Route:
+    - Return the original uploaded PDF in-browser.
     """
-    entry = data_manager.pdf_manager.get_pdf(pdf_id)
-
-    if not entry or entry.user_id != current_user.id:
-        abort(404)
-
-    return Response(entry.raw_pdf_blob,
-                    mimetype='application/pdf',
-                    headers={"Content-Disposition": "inline; filename=analysis.pdf"})
+    try:
+        entry = data_manager.pdf_manager.get_pdf(pdf_id)
+        if not entry or entry.user_id != current_user.id:
+            abort(404)
+        return Response(
+            entry.raw_pdf_blob,
+            mimetype='application/pdf',
+            headers={"Content-Disposition": f"inline; filename={entry.original_filename}"}
+        )
+    except Exception as e:
+        current_app.logger.exception("Serve PDF error: %s", e)
+        flash('Could not load PDF. Please try again later.', 'danger')
+        return redirect(url_for('status'))
 
 
 @app.route('/view_report_by_pdf/<pdf_id>', methods=['GET'])
 @login_required
 def view_report_by_pdf_id(pdf_id):
     """
-    Lookup the processed_id by pdf_id, then redirect to view_report route.
+    Redirect Route:
+    - Find processed_id for the given pdf_id and redirect to view_report.
     """
     try:
         processed = data_manager.processed_manager.get_by_pdf_id(pdf_id)
-
         if not processed or processed.pdf_data.user_id != current_user.id:
             abort(404)
-
         return redirect(url_for('view_report', processed_id=processed.id))
-
-    except Exception:
-        current_app.logger.exception("Redirecting to view_report failed")
-        flash('Unable to load report.', 'danger')
+    except Exception as e:
+        current_app.logger.exception("Redirect to report failed: %s", e)
+        flash('Could not find the report. Please try again later.', 'danger')
         return redirect(url_for('status'))
 
 
 @app.route('/logout')
 @login_required
 def logout():
+    """
+    Logout Route:
+    - Logs out the current user and returns to the home page.
+    """
     logout_user()
-    flash('You have been successfully logged out.', 'info')
+    flash('You have been logged out.', 'info')
     return redirect(url_for('index'))
 
 
-
-
-
 if __name__ == "__main__":
-    app.run(debug=True, host='0.0.0.0', port=5005)
+    # Use environment-configured host/port if available
+    host = os.getenv('FLASK_RUN_HOST', '0.0.0.0')
+    port = int(os.getenv('FLASK_RUN_PORT', 5005))
+    debug = os.getenv('FLASK_DEBUG', 'true').lower() in ('1', 'true', 'yes')
+    app.run(debug=debug, host=host, port=port)
 
-
-"""
-    -------- FEATURES: (?) --------
-"""
-
-
-# @app.route('/admin', methods=['GET'])
-# @login_required
-# def admin_dashboard():
-#     """
-#     Admin Dashboard Route:
-#     - List all user uploads, reports, and error logs
-#     - Only accessible to admin users
-#     """
-#     if current_user.role != 'admin':
-#         abort(403)  # Forbidden
-#     all_uploads = ImageAnalysisPDF.query.all()
-#     return render_template('admin.html', uploads=all_uploads)
-#
-#
-# @app.route('/api/pdf/<pdf_id>', methods=['GET'])
-# @login_required
-# def api_pdf_data(pdf_id):
-#     """
-#     API Route:
-#     - Return raw uploaded PDF data and metadata as JSON
-#     """
-#     pdf_entry = ImageAnalysisPDF.query.filter_by(id=pdf_id).first_or_404()
-#     return jsonify({
-#         'id': pdf_entry.id,
-#         'filename': pdf_entry.original_filename,
-#         'upload_date': pdf_entry.upload_date.isoformat(),
-#         'status': pdf_entry.processing_status,
-#         'user_id': pdf_entry.user_id
-#     })
-
-
-
-# Login is handled in index.html
-
-# @app.route('/login', methods=['GET', 'POST'])
-# def login():
-#     if current_user.is_authenticated:
-#         return redirect(url_for('status_dashboard'))
-#
-#     if request.method == 'POST':
-#         email    = request.form.get('email', '').strip()
-#         password = request.form.get('password', '')
-#
-#         try:
-#             user = data_manager.user_manager.get_user_by_email(email)
-#             if user and check_password_hash(user.password_hash, password):
-#                 login_user(user)
-#                 user.last_login = datetime.utcnow()
-#                 data_manager.user_manager.update_user(user.id, last_login=user.last_login)
-#                 return redirect(url_for('status_dashboard'))
-#             flash('Invalid email or password.', 'danger')
-#         except Exception:
-#             current_app.logger.exception("Login error")
-#             flash('Login failed. Please try again later.', 'danger')
-#
-#     return render_template('login.html')

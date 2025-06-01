@@ -110,7 +110,7 @@ def build_prompt(structured_data: dict) -> str:
     "You must return a JSON object that strictly follows this structure:\n"
     "```json\n"
     "{\n"
-    "  \"company\": string,                 // e.g. 'mediaire', 'Aidoc', 'Floy'\n"
+    "  \"company\": string,                 // e.g. 'mediaire', 'Aidoc', 'Floy', 'Incepto'\n"
     "  \"sequences\": [string, ...],        // e.g. ['Accelerated Sag IR-FSPGR (T1)', 'tse2d1_3']\n"
     "  \"method\": string,                  // e.g. 'AI-assisted volumetry using mdbrain v4.7.0'\n"
     "  \"region\": string,                  // e.g. 'Brain', 'Spine lumbar', 'Supratentorial'\n"

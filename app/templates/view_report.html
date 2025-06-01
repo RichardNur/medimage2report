@@ -23,145 +23,168 @@
       border: 1px solid #ccc;
       border-radius: 6px;
     }
+    .alert-disclaimer {
+      font-size: 0.95rem;
+      line-height: 1.4;
+    }
+    footer .disclaimer {
+      font-size: 0.85rem;
+      margin-top: 0.5rem;
+      color: #ddd;
+    }
   </style>
 </head>
 <body>
 
-<!-- Gradient Header -->
-<header class="py-5 text-white text-center no-print" style="background: linear-gradient(135deg, #0d6efd, #0dcaf0);">
-  <div class="container">
-    <h1 class="display-5 fw-bold">AI-Generated Medical Report</h1>
-    <p class="lead">From PDF image analysis to structured RSNA reporting</p>
-  </div>
-</header>
+  <!-- Gradient Header -->
+  <header class="py-5 text-white text-center no-print" style="background: linear-gradient(135deg, #0d6efd, #0dcaf0);">
+    <div class="container">
+      <h1 class="display-5 fw-bold">AI-Generated Medical Report</h1>
+      <p class="lead">From PDF image analysis to structured RSNA reporting</p>
+    </div>
+  </header>
 
-<!-- Navbar -->
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark no-print">
-  <div class="container">
-    <a class="navbar-brand" href="{{ url_for('index') }}">medimage2report</a>
-    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-      <span class="navbar-toggler-icon"></span>
-    </button>
-    <div class="collapse navbar-collapse" id="navbarNav">
-      <ul class="navbar-nav me-auto">
-        <li class="nav-item"><a class="nav-link" href="{{ url_for('status') }}">Dashboard</a></li>
-        <li class="nav-item"><a class="nav-link" href="{{ url_for('upload_pdf') }}">Upload</a></li>
-        <li class="nav-item"><a class="nav-link" href="{{ url_for('logout') }}">Logout</a></li>
+  <!-- Restrictions & Disclaimers Banner -->
+  <div class="container mt-3">
+    <div class="alert alert-warning alert-disclaimer text-center shadow-sm">
+      <strong>Intended Use:</strong> For licensed radiologists only. AI outputs are a support tool—do not replace clinical judgment.
+      Handle patient data sensitively. MedImage2Report is not responsible for OpenAI–generated results.
+    </div>
+  </div>
+
+  <!-- Navbar -->
+  <nav class="navbar navbar-expand-lg navbar-dark bg-dark no-print">
+    <div class="container">
+      <a class="navbar-brand" href="{{ url_for('index') }}">medimage2report</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav me-auto">
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('status') }}">Dashboard</a></li>
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('upload_pdf') }}">Upload</a></li>
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('logout') }}">Logout</a></li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <!-- PDF Preview -->
+  <div class="container mt-4">
+    <div class="card mb-4 shadow-sm">
+      <div class="card-header bg-info text-white">Original PDF Preview</div>
+      <div class="card-body">
+        <iframe src="{{ url_for('serve_pdf', pdf_id=report.pdf_data_id) }}#zoom=50"
+                width="100%" height="450px">
+        </iframe>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI Summary Instruction with Toggle -->
+  <div class="container mb-4">
+    <div class="text-end mb-2">
+      <button class="btn btn-sm btn-outline-secondary" onclick="toggleInstructions()" id="toggleBtn">
+        Hide Instructions
+      </button>
+    </div>
+
+    <div id="instructionBox" class="alert alert-primary shadow-sm">
+      <h5>Instructions for Use</h5>
+      <p>This AI-generated output provides structured, RSNA-style report sections based on your uploaded analysis PDF.</p>
+      <ul class="mb-0">
+        <li><strong>Quick Summary:</strong> A concise version for direct insertion into clinical reports.</li>
+        <li><strong>Detailed Report:</strong> A comprehensive narrative to support documentation or editing in RIS/PACS.</li>
       </ul>
-    </div>
-  </div>
-</nav>
-
-<!-- PDF Preview -->
-<div class="container mt-4">
-  <div class="card mb-4 shadow-sm">
-    <div class="card-header bg-info text-white">Original PDF Preview</div>
-    <div class="card-body">
-      <iframe src="{{ url_for('serve_pdf', pdf_id=report.pdf_data_id) }}#zoom=50"
-              width="100%" height="450px">
-      </iframe>
-    </div>
-  </div>
-</div>
-
-<!-- AI Summary Instruction with Toggle -->
-<div class="container mb-4">
-  <div class="text-end mb-2">
-    <button class="btn btn-sm btn-outline-secondary" onclick="toggleInstructions()" id="toggleBtn">
-      Hide Instructions
-    </button>
-  </div>
-
-  <div id="instructionBox" class="alert alert-primary shadow-sm">
-    <h5>Instructions for Use</h5>
-    <p>This AI-generated output provides structured, RSNA-style report sections based on your uploaded analysis PDF.</p>
-    <ul class="mb-0">
-      <li><strong>Quick Summary:</strong> A concise version for direct insertion into clinical reports.</li>
-      <li><strong>Detailed Report:</strong> A comprehensive narrative to support documentation or editing in RIS/PACS.</li>
-    </ul>
-    <p class="mt-2">Use the 📋 buttons to copy content into your radiology report system.</p>
-  </div>
-</div>
-
-<!-- AI Summary Sections -->
-<div class="container">
-  <div class="text-center mb-4">
-    <h2>Structured AI Report</h2>
-    <p class="text-muted">Generated automatically from extracted findings</p>
-  </div>
-
-  <!-- Short Summary -->
-  <div class="card mb-3 shadow-sm">
-    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-      <span>Quick Summary for Report</span>
-      <button class="btn btn-sm btn-copy no-print" title="Copy to clipboard" onclick="copyText('quickText')">📋 Copy</button>
-    </div>
-    <div class="card-body">
-      <p id="quickText">{{ report.report_section_short }}</p>
+      <p class="mt-2">Use the 📋 buttons to copy content into your radiology report system.</p>
     </div>
   </div>
 
-  <!-- Long Summary -->
-  <div class="card mb-3 shadow-sm">
-    <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
-      <span>Detailed Clinical Narrative</span>
-      <button class="btn btn-sm btn-copy no-print" title="Copy to clipboard" onclick="copyText('reportText')">📋 Copy</button>
+  <!-- AI Summary Sections -->
+  <div class="container">
+    <div class="text-center mb-4">
+      <h2>Structured AI Report</h2>
+      <p class="text-muted">Generated automatically from extracted findings</p>
     </div>
-    <div class="card-body">
-      <pre id="reportText" style="white-space: pre-wrap;">{{ report.report_section_long }}</pre>
+
+    <!-- Short Summary -->
+    <div class="card mb-3 shadow-sm">
+      <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+        <span>Quick Summary for Report</span>
+        <button class="btn btn-sm btn-copy no-print" title="Copy to clipboard" onclick="copyText('quickText')">📋 Copy</button>
+      </div>
+      <div class="card-body">
+        <p id="quickText">{{ report.report_section_short }}</p>
+      </div>
+    </div>
+
+    <!-- Long Summary -->
+    <div class="card mb-3 shadow-sm">
+      <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
+        <span>Detailed Clinical Narrative</span>
+        <button class="btn btn-sm btn-copy no-print" title="Copy to clipboard" onclick="copyText('reportText')">📋 Copy</button>
+      </div>
+      <div class="card-body">
+        <pre id="reportText" style="white-space: pre-wrap;">{{ report.report_section_long }}</pre>
+      </div>
+    </div>
+
+    <!-- Meta Information -->
+    <div class="row">
+      <div class="col-md-6">
+        <h5>Analysis Metadata</h5>
+        <ul class="list-group">
+          <li class="list-group-item"><strong>Company:</strong> {{ report.company_name }}</li>
+          <li class="list-group-item"><strong>Method:</strong> {{ report.method_used }}</li>
+          <li class="list-group-item"><strong>Region:</strong> {{ report.body_region }}</li>
+          <li class="list-group-item"><strong>Modality:</strong> {{ report.modality }}</li>
+          <li class="list-group-item"><strong>Sequences:</strong> {{ report.sequences }}</li>
+          <li class="list-group-item"><strong>Quality Score:</strong> {{ report.report_quality_score }}</li>
+          <li class="list-group-item"><strong>Created:</strong> {{ report.created_at.strftime('%Y-%m-%d %H:%M') }}</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="mt-4 no-print">
+      <a href="{{ url_for('status') }}" class="btn btn-outline-primary">← Back to Dashboard</a>
     </div>
   </div>
 
-  <!-- Meta Information -->
-  <div class="row">
-    <div class="col-md-6">
-      <h5>Analysis Metadata</h5>
-      <ul class="list-group">
-        <li class="list-group-item"><strong>Company:</strong> {{ report.company_name }}</li>
-        <li class="list-group-item"><strong>Method:</strong> {{ report.method_used }}</li>
-        <li class="list-group-item"><strong>Region:</strong> {{ report.body_region }}</li>
-        <li class="list-group-item"><strong>Modality:</strong> {{ report.modality }}</li>
-        <li class="list-group-item"><strong>Sequences:</strong> {{ report.sequences }}</li>
-        <li class="list-group-item"><strong>Quality Score:</strong> {{ report.report_quality_score }}</li>
-        <li class="list-group-item"><strong>Created:</strong> {{ report.created_at.strftime('%Y-%m-%d %H:%M') }}</li>
-      </ul>
+  <!-- Footer with brief disclaimer -->
+  <footer class="bg-dark text-white text-center py-3 mt-5">
+    <small>&copy; 2025 medimage2report. All rights reserved. Version 1.0</small>
+    <div class="disclaimer">
+      <p>
+        <strong>Disclaimer:</strong> AI is a supporting tool—final decisions rest with the radiologist.
+        Protect patient data per local regulations. MedImage2Report is not responsible for AI output accuracy.
+      </p>
     </div>
-  </div>
+  </footer>
 
-  <div class="mt-4 no-print">
-    <a href="{{ url_for('status') }}" class="btn btn-outline-primary">← Back to Dashboard</a>
-  </div>
-</div>
-
-<!-- Footer -->
-<footer class="bg-dark text-white text-center py-3 mt-5">
-  <small>&copy; 2025 medimage2report. All rights reserved. Version 1.0</small>
-</footer>
-
-<script>
-  function copyText(elementId) {
-    const text = document.getElementById(elementId).innerText;
-    navigator.clipboard.writeText(text).then(() => {
-      alert('Copied to clipboard');
-    }).catch(() => {
-      alert('Copy failed');
-    });
-  }
-
-  function toggleInstructions() {
-    const box = document.getElementById("instructionBox");
-    const btn = document.getElementById("toggleBtn");
-
-    if (box.style.display === "none") {
-      box.style.display = "block";
-      btn.textContent = "Hide Instructions";
-    } else {
-      box.style.display = "none";
-      btn.textContent = "Show Instructions";
+  <script>
+    function copyText(elementId) {
+      const text = document.getElementById(elementId).innerText;
+      navigator.clipboard.writeText(text).then(() => {
+        alert('Copied to clipboard');
+      }).catch(() => {
+        alert('Copy failed');
+      });
     }
-  }
-</script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    function toggleInstructions() {
+      const box = document.getElementById("instructionBox");
+      const btn = document.getElementById("toggleBtn");
+
+      if (box.style.display === "none") {
+        box.style.display = "block";
+        btn.textContent = "Hide Instructions";
+      } else {
+        box.style.display = "none";
+        btn.textContent = "Show Instructions";
+      }
+    }
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
 </body>
 </html>

@@ -1,6 +1,9 @@
 from abc import ABC
-from flask_login import LoginManager, UserMixin
-from data.models.models import User, ImageAnalysisPDF, ProcessedImageAnalysisData,db
+from datetime import datetime, timezone
+from flask_login import LoginManager
+from data.models.models import User, ImageAnalysisPDF, ProcessedImageAnalysisData, ErrorLog, db
+from utils.helpers import generate_unique_id
+
 
 class DataManagerInterface(ABC):
     """
@@ -77,13 +80,30 @@ class UserDataManager:
             raise e
 
     def delete_user(self, id):
-        """
-        Delete a user by ID.
+        try:
+            user = User.query.get(id)
+            if not user:
+                return False
+            db.session.delete(user)
+            db.session.commit()
+            return True
 
-        :param id:
-        :return:
-        """
-        pass
+        except Exception as e:
+            db.session.rollback()
+
+            # Log the error directly via the ErrorLog model
+            err = ErrorLog(
+                id=generate_unique_id(),
+                pdf_data_id=None,                            # no PDF in this context
+                error_type="UserDeletionError",
+                error_message=str(e),
+                timestamp=datetime.now(timezone.utc)         # timezone‐aware
+            )
+            db.session.add(err)
+            db.session.commit()
+
+            # re-raise so caller still sees the exception if they want to handle it
+            raise
 
     def get_all_users(self):
         """
@@ -249,34 +269,53 @@ class ErrorLogManager:
     """
     Manages ErrorLog table operations.
     """
-
     def log_error(self, id, pdf_data_id, error_type, error_message, timestamp):
         """
         Log an error that occurred during processing.
-
-        :param id:
-        :param pdf_data_id:
-        :param error_type:
-        :param error_message:
-        :param timestamp:
-        :return:
         """
-        pass
+        from data.models.models import ErrorLog
+        entry = ErrorLog(
+            id=id,
+            pdf_data_id=pdf_data_id,
+            error_type=error_type,
+            error_message=error_message,
+            timestamp=timestamp
+        )
+        db.session.add(entry)
+        db.session.commit()
+        return entry
 
     def get_errors_by_pdf_id(self, pdf_data_id):
         """
         Retrieve error logs related to a specific PDF entry.
-
-        :param pdf_data_id:
-        :return:
         """
-        pass
+        from data.models.models import ErrorLog
+        return (
+            ErrorLog.query
+            .filter_by(pdf_data_id=pdf_data_id)
+            .order_by(ErrorLog.timestamp.desc())
+            .all()
+        )
 
     def delete_error(self, id):
         """
-        Delete an error log.
-
-        :param id:
-        :return:
+        Delete a single error log by its ID.
         """
-        pass
+        from data.models.models import ErrorLog
+        entry = ErrorLog.query.get(id)
+        if entry:
+            db.session.delete(entry)
+            db.session.commit()
+            return True
+        return False
+
+    def clear_errors_by_pdf_id(self, pdf_data_id):
+        """
+        Delete all error logs for a given PDF.
+        """
+        from data.models.models import ErrorLog
+        entries = ErrorLog.query.filter_by(pdf_data_id=pdf_data_id).all()
+        for entry in entries:
+            db.session.delete(entry)
+        db.session.commit()
+        return len(entries)

@@ -41,6 +41,18 @@
     footer {
       background-color: #0d6efd;
     }
+
+    .disclaimer {
+      font-size: 0.875rem;
+      color: #6c757d;
+      margin-top: 0.5rem;
+    }
+
+    .alert-disclaimer {
+      font-size: 0.9rem;
+      margin-bottom: 1rem;
+      text-align: center;
+    }
   </style>
 </head>
 <body>
@@ -75,6 +87,13 @@
   <div class="container mt-5">
 
     {% if current_user.is_authenticated %}
+      <!-- Disclaimers for authenticated users -->
+      <div class="alert alert-warning alert-disclaimer shadow-sm">
+        <strong>Intended Use:</strong> This platform is a tool for licensed radiologists to integrate AI outputs into structured reports.<br>
+        <strong>Disclaimer:</strong> AI results do <em>not</em> replace the radiologist’s judgment. Always verify findings against original imaging data.<br>
+        <strong>Note:</strong> MedImage2Report is not responsible for accuracy of OpenAI-generated outputs. Treat all patient data as sensitive.
+      </div>
+
       <div class="alert alert-info text-center shadow-sm">
         <h4 class="mb-3">Welcome, {{ current_user.name or current_user.email }}!</h4>
         <div class="d-grid gap-2 d-sm-flex justify-content-sm-center mb-3">
@@ -84,6 +103,12 @@
         <a href="{{ url_for('logout') }}" class="btn btn-outline-danger btn-sm mt-2">Log Out</a>
       </div>
     {% else %}
+      <!-- Disclaimers for unauthenticated page -->
+      <div class="alert alert-warning alert-disclaimer shadow-sm">
+        <strong>Intended Use:</strong> This platform is a tool for licensed radiologists to integrate AI outputs into structured reports.<br>
+        <strong>Disclaimer:</strong> AI results do <em>not</em> replace the radiologist’s judgment. Treat all patient data as sensitive.
+      </div>
+
       <div class="row justify-content-center">
         <div class="col-md-6">
           <div class="card card-custom p-4">
@@ -118,58 +143,66 @@
     {% endwith %}
   </div>
 
-<!-- About Section -->
-<div class="container mt-5">
-  <h2 class="text-center mb-4">About medimage2report</h2>
-  <p>
-    As artificial intelligence continues to expand its role in medical imaging, radiologists are increasingly tasked with incorporating AI-generated findings into structured diagnostic reports. <strong>medimage2report</strong> is designed to streamline this process.
-  </p>
-  <p>
-    This platform enables radiologists to automatically transform AI analysis outputs — typically delivered in PDF format by tools such as <em>mediaire</em>, <em>deepc</em>, or <em>quibim</em> — into clear, RSNA-compliant report sections. Our backend extracts clinically relevant insights, applies domain-specific processing, and generates standardized findings using a GPT-powered engine.
-  </p>
-  <p>
-    By integrating medimage2report into your workflow, you reduce manual documentation effort, improve consistency across reports, and save valuable time — especially when managing increasing volumes of AI-derived data. The system is particularly useful in domains such as:
-  </p>
-  <ul>
-    <li>Neuroradiological AI outputs (e.g. volumetry, aneurysm detection)</li>
-    <li>Oncologic reporting with lesion quantification</li>
-    <li>Spinal and musculoskeletal findings from segmentation/classification models</li>
-    <li>Thoracic imaging including future support for TB screening tools</li>
-  </ul>
-  <p>
-    medimage2report is built with radiologists in mind: structured, compliant, efficient. For questions or collaboration inquiries, contact <a href="mailto:Richard_Nuernberger@outlook.com">Richard_Nuernberger@outlook.com</a>.
-  </p>
-</div>
+  <!-- About Section -->
+  <div class="container mt-5">
+    <h2 class="text-center mb-4">About medimage2report</h2>
+    <p>
+      As artificial intelligence continues to expand its role in medical imaging, radiologists are increasingly tasked with incorporating AI-generated findings into structured diagnostic reports. <strong>medimage2report</strong> is designed to streamline this process.
+    </p>
+    <p>
+      This platform enables radiologists to automatically transform AI analysis outputs — typically delivered in PDF format by tools such as <em>mediaire</em>, <em>deepc</em>, or <em>quibim</em> — into clear, RSNA-compliant report sections. Our backend extracts clinically relevant insights, applies domain-specific processing, and generates standardized findings using a GPT-powered engine.
+    </p>
+    <p>
+      By integrating medimage2report into your workflow, you reduce manual documentation effort, improve consistency across reports, and save valuable time — especially when managing increasing volumes of AI-derived data. The system is particularly useful in domains such as:
+    </p>
+    <ul>
+      <li>Neuroradiological AI outputs (e.g. volumetry, aneurysm detection)</li>
+      <li>Oncologic reporting with lesion quantification</li>
+      <li>Spinal and musculoskeletal findings from segmentation/classification models</li>
+      <li>Thoracic imaging including future support for TB screening tools</li>
+    </ul>
+    <p>
+      medimage2report is built with radiologists in mind: structured, compliant, efficient. For questions or collaboration inquiries, contact <a href="mailto:Richard_Nuernberger@outlook.com">Richard_Nuernberger@outlook.com</a>.
+    </p>
+  </div>
 
-<div class="container section-divider"></div>
+  <div class="container section-divider"></div>
 
-<!-- Workflow Example -->
-<div class="container">
-  <h2 class="text-center mb-4">Workflow Example</h2>
-  <p>Here's how medimage2report converts an AI-generated aneurysm analysis into a structured report:</p>
-  <div class="row mt-4">
-    <div class="col-md-6">
-      <h5>Step 1: Upload PDF</h5>
-      <p>Example report from <a href="https://mediaire.ai/wp-content/uploads/2022/11/mdbrain47_SampleAneurysmEN.pdf" target="_blank">mediaire GmbH</a>.</p>
-      <div class="border rounded bg-white shadow-sm p-2">
-        <embed src="https://mediaire.ai/wp-content/uploads/2022/11/mdbrain47_SampleAneurysmEN.pdf" type="application/pdf" width="100%" height="400px" />
+  <!-- Workflow Example -->
+  <div class="container">
+    <h2 class="text-center mb-4">Workflow Example</h2>
+    <p>Here's how medimage2report converts an AI-generated aneurysm analysis into a structured report:</p>
+    <div class="row mt-4">
+      <div class="col-md-6">
+        <h5>Step 1: Upload PDF</h5>
+        <p>Example report from <a href="https://mediaire.ai/wp-content/uploads/2022/11/mdbrain47_SampleAneurysmEN.pdf" target="_blank">mediaire GmbH</a>.</p>
+        <div class="border rounded bg-white shadow-sm p-2">
+          <embed src="https://mediaire.ai/wp-content/uploads/2022/11/mdbrain47_SampleAneurysmEN.pdf"
+                 type="application/pdf" width="100%" height="400px" />
+        </div>
       </div>
-    </div>
-    <div class="col-md-6">
-      <h5>Step 2: AI-Generated Summary</h5>
-      <p>Our backend extracted structured findings and converted them to RSNA-style prose.</p>
-      <div class="border rounded bg-white shadow-sm p-2">
-        <img src="{{ url_for('static', filename='img/sample_output_aneurysm.png') }}" class="img-fluid" alt="Generated Report Screenshot">
+      <div class="col-md-6">
+        <h5>Step 2: AI-Generated Summary</h5>
+        <p>Our backend extracted structured findings and converted them to RSNA-style prose.</p>
+        <div class="border rounded bg-white shadow-sm p-2">
+          <img src="{{ url_for('static', filename='img/sample_output_aneurysm.png') }}"
+               class="img-fluid" alt="Generated Report Screenshot">
+        </div>
       </div>
     </div>
   </div>
-</div>
 
-<!-- Footer -->
-<footer class="text-white text-center py-3 mt-5">
-  <small>&copy; 2025 medimage2report · All rights reserved · Version 1.0</small>
-</footer>
+  <!-- Footer -->
+  <footer class="text-white text-center py-3 mt-5">
+    <small>&copy; 2025 medimage2report · All rights reserved · Version 1.0</small>
+    <div class="disclaimer mt-2">
+      <p>
+        <strong>Disclaimer:</strong> MedImage2Report is not responsible for the accuracy of AI-generated outputs (OpenAI).<br>
+        AI is a supporting tool; final diagnostic decisions rest with the radiologist. Handle all patient data in compliance with your local regulations.
+      </p>
+    </div>
+  </footer>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
