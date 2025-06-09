@@ -8,7 +8,7 @@ import pytesseract
 import io
 import re
 from PIL import Image, ImageOps, ImageFilter, ImageEnhance
-from pytesseract import TesseractError
+
 
 # Load the environment variable from .env file
 load_dotenv()
@@ -111,10 +111,10 @@ def build_prompt(structured_data: dict) -> str:
     "You must return a JSON object that strictly follows this structure:\n"
     "```json\n"
     "{\n"
-    "  \"company\": string,                 // e.g. 'mediaire', 'Aidoc', 'Floy', 'Incepto'\n"
+    "  \"company\": string,                 // e.g. 'mediaire'\n"
     "  \"sequences\": [string, ...],        // e.g. ['Accelerated Sag IR-FSPGR (T1)', 'tse2d1_3']\n"
     "  \"method\": string,                  // e.g. 'AI-assisted volumetry using mdbrain v4.7.0'\n"
-    "  \"region\": string,                  // e.g. 'Brain', 'Spine lumbar', 'Supratentorial'\n"
+    "  \"region\": string,                  // e.g. 'Brain', 'Spine lumbar'\n"
     "  \"modality\": string,                // e.g. 'MR', 'CT'\n"
     "  \"short_text\": string,              // RSNA-style summary for radiology report integration\n"
     "  \"long_text\": string,               // Layperson-friendly version of the above\n"
@@ -152,3 +152,36 @@ def call_openai(prompt):
     except json.JSONDecodeError as e:
         print("JSONDecodeError:", str(e))
         raise ValueError("OpenAI did not return valid JSON. Prompt might need refinement.")
+
+
+def call_gemini(prompt):
+    import google.generativeai as genai
+
+    # Configure the client with your API key
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        raise RuntimeError("GEMINI_API_KEY is not set in the environment.")
+
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel("gemini-2.0-flash-exp")
+
+    # Generate a response using the Gemini API
+    response = model.generate_content(prompt)
+    text = response.text
+
+    # 2) Strip ```json and ``` if present
+    cleaned = re.sub(r"```json|```", "", text).strip()
+
+    # 3) Parse to dict
+    try:
+        data = json.loads(cleaned)
+        return data
+    except json.JSONDecodeError as e:
+        # Optionally log raw text and the exception
+        print("Gemini raw response:", repr(text))
+        print("Cleaned for JSON:", repr(cleaned))
+        raise ValueError("Gemini did not return valid JSON.") from e
+
+
+
+

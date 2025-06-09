@@ -10,7 +10,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from data.models.models import User, ErrorLog, db
 from data.sqlite_data_manager import DataManagerInterface
 from utils.helpers import generate_unique_id
-from app.services.pdf_processing import extract_pdf_content, build_prompt, call_openai
+from app.services.pdf_processing import extract_pdf_content, build_prompt, call_openai, call_gemini
 
 
 # Load .env as early as possible
@@ -234,7 +234,7 @@ def process_pdf(pdf_id):
 
         # 3) build prompt & call GPT
         prompt = build_prompt(extracted)
-        ai_response = call_openai(prompt)
+        ai_response = call_gemini(prompt)
 
         # 4) persist AI output
         proc_id = generate_unique_id()
