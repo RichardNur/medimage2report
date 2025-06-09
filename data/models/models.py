@@ -59,25 +59,27 @@ class ImageAnalysisPDF(db.Model):
 
 
 class ProcessedImageAnalysisData(db.Model):
-    """
-    Stores AI-processed outputs derived from uploaded PDF data.
-    """
     __tablename__ = 'PROCESSED_IMAGE_ANALYSIS_DATA'
 
     id = Column(String(26), primary_key=True)
     pdf_data_id = Column(String(26), ForeignKey('PDF_IMAGE_ANALYSIS_DATA.id'), nullable=False)
+
     company_name = Column(String(100), nullable=True)
-    sequences = Column(String(255), nullable=True)
-    method_used = Column(String(100), nullable=True)
-    body_region = Column(String(100), nullable=True)
-    modality = Column(String(100), nullable=True)
-    report_section_short = Column(Text, nullable=True)
-    report_section_long = Column(Text, nullable=True)
+    sequences    = Column(String(255), nullable=True)
+    method_used  = Column(String(100), nullable=True)
+    body_region  = Column(String(100), nullable=True)
+    modality     = Column(String(100), nullable=True)
+
+    # existing fields
+    report_section_short_openai = Column(Text, nullable=True)
+    report_section_long_openai  = Column(Text, nullable=True)
+    report_section_short_gemini = Column(Text, nullable=True)
+    report_section_long_gemini  = Column(Text, nullable=True)
+
     report_quality_score = Column(String(10), nullable=True)
-    created_at = Column(DateTime, default=datetime.now(timezone.utc), nullable=False)
+    created_at           = Column(DateTime, default=datetime.now(timezone.utc), nullable=False)
 
     pdf_data = relationship("ImageAnalysisPDF", backref="processed_reports")
-
 
     def __repr__(self):
         return f'<ProcessedData {self.id}>'
