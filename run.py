@@ -211,67 +211,53 @@ def upload_pdf():
 @app.route('/process/<pdf_id>', methods=['GET', 'POST'])
 @login_required
 def process_pdf(pdf_id):
-    """
-    Process Route:
-    - Triggered after upload
-    - Extract content from uploaded PDF
-    - Build prompt and call OpenAI
-    - Store the processed output
-    - Redirect to /view_report/<processed_id> or error page
-    """
     try:
         entry = data_manager.pdf_manager.get_pdf(pdf_id)
         if not entry or entry.user_id != current_user.id:
             abort(404)
 
-        # 1) mark as processing
         data_manager.pdf_manager.update_processing_status(pdf_id, 'processing')
 
-        # 2) extract text
         extracted = extract_pdf_content(entry.raw_pdf_blob, lang="deu")
-        if not extracted or not extracted.get('raw_text'):
-            raise ValueError("No usable text extracted from PDF.")
+        if not extracted.get('raw_text'):
+            raise ValueError("No usable text extracted.")
 
-        # 3) build prompt & call GPT
         prompt = build_prompt(extracted)
-        ai_response = call_gemini(prompt)
 
-        # 4) persist AI output
+        # get both OpenAI & Gemini
+        oa = call_openai(prompt)
+        gm = call_gemini(prompt)
+
         proc_id = generate_unique_id()
         now = datetime.now(timezone.utc)
-        sequences = ai_response.get('sequences', [])
-        if isinstance(sequences, list):
-            sequences = ", ".join(sequences)
+
+        seqs = oa.get('sequences', [])
+        seqs = ", ".join(seqs) if isinstance(seqs, list) else seqs
 
         data_manager.processed_manager.add_processed_data(
             id=proc_id,
             pdf_data_id=pdf_id,
-            company_name   = ai_response.get('company'),
-            sequences      = sequences,
-            method_used    = ai_response.get('method'),
-            body_region    = ai_response.get('region'),
-            modality       = ai_response.get('modality'),
-            report_section_short = ai_response.get('short_text'),
-            report_section_long  = ai_response.get('long_text'),
-            report_quality_score = ai_response.get('quality'),
-            created_at=now
+            company_name          = oa.get('company'),
+            sequences             = seqs,
+            method_used           = oa.get('method'),
+            body_region           = oa.get('region'),
+            modality              = oa.get('modality'),
+            report_section_short_openai = oa.get('short_text'),
+            report_section_long_openai  = oa.get('long_text'),
+            report_section_short_gemini = gm.get('short_text'),
+            report_section_long_gemini  = gm.get('long_text'),
+            report_quality_score  = oa.get('quality'),
+            created_at            = now
         )
 
-        # 5) mark as done
         data_manager.pdf_manager.update_processing_status(pdf_id, 'processed')
         return redirect(url_for('view_report', processed_id=proc_id))
 
     except Exception as exc:
-        # 1) log full traceback
         current_app.logger.exception("Processing error on PDF %s", pdf_id)
-
-        # 2) persist error + update status
         _log_pdf_error(pdf_id, exc)
-
-        # 3) send user to the error‐view
-        flash("An error occurred during processing. See error log for details.", "warning")
+        flash("An error occurred. See error log.", "warning")
         return redirect(url_for('error_log', pdf_id=pdf_id))
-
 
 
 @app.route('/status', methods=['GET'])

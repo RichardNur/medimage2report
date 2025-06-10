@@ -174,13 +174,24 @@ class PDFDataManager:
 
 
 
+
+
+
+
+
 class ProcessedDataManager:
     """
     Manages ProcessedImageAnalysisData table operations.
     """
 
-    def add_processed_data(self, id, pdf_data_id, company_name, sequences, method_used, body_region,
-                           modality, report_section_short, report_section_long, report_quality_score, created_at):
+    def add_processed_data(
+        self,
+        id, pdf_data_id, company_name, sequences, method_used, body_region,
+        modality,
+        report_section_short_openai, report_section_long_openai,
+        report_section_short_gemini, report_section_long_gemini,
+        report_quality_score, created_at
+    ):
         try:
             entry = ProcessedImageAnalysisData(
                 id=id,
@@ -190,17 +201,19 @@ class ProcessedDataManager:
                 method_used=method_used,
                 body_region=body_region,
                 modality=modality,
-                report_section_short=report_section_short,
-                report_section_long=report_section_long,
+                report_section_short_openai=report_section_short_openai,
+                report_section_long_openai=report_section_long_openai,
+                report_section_short_gemini=report_section_short_gemini,
+                report_section_long_gemini=report_section_long_gemini,
                 report_quality_score=report_quality_score,
                 created_at=created_at
             )
             db.session.add(entry)
             db.session.commit()
             return entry
-        except Exception as e:
+        except Exception:
             db.session.rollback()
-            raise e
+            raise
 
     def get_processed_data(self, id):
         return ProcessedImageAnalysisData.query.get(id)
