@@ -222,9 +222,10 @@ def process_pdf(pdf_id):
         if not extracted.get('raw_text'):
             raise ValueError("No usable text extracted.")
 
+        # This now creates the prompt asking for both EN and DE content
         prompt = build_prompt(extracted)
 
-        # get both OpenAI & Gemini
+        # Assume call_openai/gemini return a dict with the new keys
         oa = call_openai(prompt)
         gm = call_gemini(prompt)
 
@@ -234,20 +235,30 @@ def process_pdf(pdf_id):
         seqs = oa.get('sequences', [])
         seqs = ", ".join(seqs) if isinstance(seqs, list) else seqs
 
+        # Pass the EN and DE data directly from the AI response to your data manager
         data_manager.processed_manager.add_processed_data(
             id=proc_id,
             pdf_data_id=pdf_id,
-            company_name          = oa.get('company'),
-            sequences             = seqs,
-            method_used           = oa.get('method'),
-            body_region           = oa.get('region'),
-            modality              = oa.get('modality'),
-            report_section_short_openai = oa.get('short_text'),
-            report_section_long_openai  = oa.get('long_text'),
-            report_section_short_gemini = gm.get('short_text'),
-            report_section_long_gemini  = gm.get('long_text'),
-            report_quality_score  = oa.get('quality'),
-            created_at            = now
+            company_name=oa.get('company'),
+            sequences=seqs,
+            method_used=oa.get('method'),
+            body_region=oa.get('region'),
+            modality=oa.get('modality'),
+
+            # English Reports from API
+            report_section_short_openai=oa.get('short_text_en'),
+            report_section_long_openai=oa.get('long_text_en'),
+            report_section_short_gemini=gm.get('short_text_en'),
+            report_section_long_gemini=gm.get('long_text_en'),
+
+            # German Reports from API
+            report_section_short_openai_de=oa.get('short_text_de'),
+            report_section_long_openai_de=oa.get('long_text_de'),
+            report_section_short_gemini_de=gm.get('short_text_de'),
+            report_section_long_gemini_de=gm.get('long_text_de'),
+
+            report_quality_score=oa.get('quality'),
+            created_at=now
         )
 
         data_manager.pdf_manager.update_processing_status(pdf_id, 'processed')
