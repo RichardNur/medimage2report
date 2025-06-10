@@ -6,59 +6,33 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
-    body {
-      background-color: #f4f9fc;
-    }
-    @media print {
-      .no-print {
-        display: none;
-      }
-    }
-    .btn-copy {
-      background: #ffffff;
-      border: 1px solid #ccc;
-      font-size: 0.875rem;
-    }
-    iframe {
-      border: 1px solid #ccc;
-      border-radius: 6px;
-    }
-    .alert-disclaimer {
-      font-size: 0.95rem;
-      line-height: 1.4;
-    }
-    footer .disclaimer {
-      font-size: 0.85rem;
-      margin-top: 0.5rem;
-      color: #ddd;
+    body { background-color: #f4f9fc; }
+    @media print { .no-print { display: none; } }
+    .btn-copy { background: #ffffff; border: 1px solid #ccc; font-size: 0.875rem; }
+    iframe { border: 1px solid #ccc; border-radius: 6px; }
+    .alert-disclaimer { font-size: 0.95rem; line-height: 1.4; }
+    footer .disclaimer { font-size: 0.85rem; margin-top: 0.5rem; color: #ddd; }
+
+    /* --- NEW STYLES --- */
+    /* Hide German text by default */
+    .lang-de { display: none; }
+    .report-content-wrapper pre {
+        white-space: pre-wrap;
+        margin-bottom: 0;
     }
   </style>
 </head>
 <body>
 
-  <!-- Gradient Header -->
   <header class="py-5 text-white text-center no-print" style="background: linear-gradient(135deg, #0d6efd, #0dcaf0);">
     <div class="container">
       <h1 class="display-5 fw-bold">AI-Generated Medical Report</h1>
       <p class="lead">From PDF image analysis to structured RSNA reporting</p>
     </div>
   </header>
-
-  <!-- Restrictions & Disclaimers Banner -->
-  <div class="container mt-3">
-    <div class="alert alert-warning alert-disclaimer text-center shadow-sm">
-      <strong>Intended Use:</strong> For licensed radiologists only. AI outputs are a support tool—do not replace clinical judgment.
-      Handle patient data sensitively. MedImage2Report is not responsible for OpenAI–generated results.
-    </div>
-  </div>
-
-  <!-- Navbar -->
   <nav class="navbar navbar-expand-lg navbar-dark bg-dark no-print">
     <div class="container">
       <a class="navbar-brand" href="{{ url_for('index') }}">medimage2report</a>
-      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-        <span class="navbar-toggler-icon"></span>
-      </button>
       <div class="collapse navbar-collapse" id="navbarNav">
         <ul class="navbar-nav me-auto">
           <li class="nav-item"><a class="nav-link" href="{{ url_for('status') }}">Dashboard</a></li>
@@ -69,7 +43,6 @@
     </div>
   </nav>
 
-  <!-- PDF Preview -->
   <div class="container mt-4">
     <div class="card mb-4 shadow-sm">
       <div class="card-header bg-info text-white">Original PDF Preview</div>
@@ -81,73 +54,62 @@
     </div>
   </div>
 
-  <!-- AI Summary Instruction with Toggle -->
-  <div class="container mb-4">
-    <div class="text-end mb-2">
-      <button class="btn btn-sm btn-outline-secondary" onclick="toggleInstructions()" id="toggleBtn">
-        Hide Instructions
-      </button>
-    </div>
-
-    <div id="instructionBox" class="alert alert-primary shadow-sm">
-      <h5>Instructions for Use</h5>
-      <p>This AI-generated output provides structured, RSNA-style report sections based on your uploaded analysis PDF.</p>
-      <ul class="mb-0">
-        <li><strong>Quick Summary:</strong> A concise version for direct insertion into clinical reports.</li>
-        <li><strong>Detailed Report:</strong> A comprehensive narrative to support documentation or editing in RIS/PACS.</li>
-      </ul>
-      <p class="mt-2">Use the 📋 buttons to copy content into your radiology report system.</p>
-    </div>
-  </div>
-
-<!-- AI Summary Sections -->
 <div class="container">
-  <div class="text-center mb-4">
-    <h2>Structured AI Reports</h2>
-    <p class="text-muted">Compare outputs from OpenAI vs. Gemini</p>
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2>Structured AI Reports</h2>
+        <p class="text-muted mb-0">Compare outputs from OpenAI vs. Gemini</p>
+    </div>
+    <div class="btn-group no-print" role="group">
+        <button type="button" class="btn btn-primary active" id="btn-lang-en" onclick="switchLanguage('en')">English</button>
+        <button type="button" class="btn btn-outline-primary" id="btn-lang-de" onclick="switchLanguage('de')">Deutsch</button>
+    </div>
   </div>
+
 
   <div class="row g-4">
-    <!-- OpenAI Column -->
     <div class="col-md-6">
       <div class="card mb-3 shadow-sm">
         <div class="card-header bg-olive text-white d-flex justify-content-between">
           <span>OpenAI – Quick Summary</span>
-          <button class="btn btn-sm btn-copy no-print" onclick="copyText('oaQuick')">📋</button>
+          <button class="btn btn-sm btn-copy no-print" onclick="copyActiveText(this)">📋</button>
         </div>
-        <div class="card-body">
-          <p id="oaQuick">{{ report.report_section_short_openai }}</p>
+        <div class="card-body report-content-wrapper">
+          <div class="lang-en"><p>{{ report.report_section_short_openai }}</p></div>
+          <div class="lang-de"><p>{{ report.report_section_short_openai_de }}</p></div>
         </div>
       </div>
       <div class="card shadow-sm">
         <div class="card-header bg-dark text-white d-flex justify-content-between">
           <span>OpenAI – Detailed Narrative</span>
-          <button class="btn btn-sm btn-copy no-print" onclick="copyText('oaLong')">📋</button>
+          <button class="btn btn-sm btn-copy no-print" onclick="copyActiveText(this)">📋</button>
         </div>
-        <div class="card-body">
-          <pre id="oaLong" style="white-space: pre-wrap;">{{ report.report_section_long_openai }}</pre>
+        <div class="card-body report-content-wrapper">
+            <pre class="lang-en">{{ report.report_section_long_openai }}</pre>
+            <pre class="lang-de">{{ report.report_section_long_openai_de }}</pre>
         </div>
       </div>
     </div>
 
-    <!-- Gemini Column -->
     <div class="col-md-6">
       <div class="card mb-3 shadow-sm">
         <div class="card-header bg-info text-white d-flex justify-content-between">
           <span>Gemini – Quick Summary</span>
-          <button class="btn btn-sm btn-copy no-print" onclick="copyText('gmQuick')">📋</button>
+          <button class="btn btn-sm btn-copy no-print" onclick="copyActiveText(this)">📋</button>
         </div>
-        <div class="card-body">
-          <p id="gmQuick">{{ report.report_section_short_gemini }}</p>
+        <div class="card-body report-content-wrapper">
+            <div class="lang-en"><p>{{ report.report_section_short_gemini }}</p></div>
+            <div class="lang-de"><p>{{ report.report_section_short_gemini_de }}</p></div>
         </div>
       </div>
       <div class="card shadow-sm">
         <div class="card-header bg-primary text-white d-flex justify-content-between">
           <span>Gemini – Detailed Narrative</span>
-          <button class="btn btn-sm btn-copy no-print" onclick="copyText('gmLong')">📋</button>
+          <button class="btn btn-sm btn-copy no-print" onclick="copyActiveText(this)">📋</button>
         </div>
-        <div class="card-body">
-          <pre id="gmLong" style="white-space: pre-wrap;">{{ report.report_section_long_gemini }}</pre>
+        <div class="card-body report-content-wrapper">
+            <pre class="lang-en">{{ report.report_section_long_gemini }}</pre>
+            <pre class="lang-de">{{ report.report_section_long_gemini_de }}</pre>
         </div>
       </div>
     </div>
@@ -159,55 +121,77 @@
 </div>
 
 
-    <!-- Meta Information -->
-    <div class="row">
-      <div class="col-md-6">
-        <h5>Analysis Metadata</h5>
-        <ul class="list-group">
-          <li class="list-group-item"><strong>Company:</strong> {{ report.company_name }}</li>
-          <li class="list-group-item"><strong>Method:</strong> {{ report.method_used }}</li>
-          <li class="list-group-item"><strong>Region:</strong> {{ report.body_region }}</li>
-          <li class="list-group-item"><strong>Modality:</strong> {{ report.modality }}</li>
-          <li class="list-group-item"><strong>Sequences:</strong> {{ report.sequences }}</li>
-          <li class="list-group-item"><strong>Quality Score:</strong> {{ report.report_quality_score }}</li>
-          <li class="list-group-item"><strong>Created:</strong> {{ report.created_at.strftime('%Y-%m-%d %H:%M') }}</li>
-        </ul>
+    <div class="container mt-5">
+      <div class="row">
+          <div class="col-md-6">
+            <h5>Analysis Metadata</h5>
+            <ul class="list-group">
+              <li class="list-group-item"><strong>Company:</strong> {{ report.company_name }}</li>
+              <li class="list-group-item"><strong>Method:</strong> {{ report.method_used }}</li>
+              <li class="list-group-item"><strong>Region:</strong> {{ report.body_region }}</li>
+              <li class="list-group-item"><strong>Modality:</strong> {{ report.modality }}</li>
+              <li class="list-group-item"><strong>Sequences:</strong> {{ report.sequences }}</li>
+              <li class="list-group-item"><strong>Quality Score:</strong> {{ report.report_quality_score }}</li>
+              <li class="list-group-item"><strong>Created:</strong> {{ report.created_at.strftime('%Y-%m-%d %H:%M') }}</li>
+            </ul>
+          </div>
       </div>
     </div>
 
-    <div class="mt-4 no-print">
-      <a href="{{ url_for('status') }}" class="btn btn-outline-primary">← Back to Dashboard</a>
-    </div>
-  </div>
-
-  <!-- Footer with brief disclaimer -->
   <footer class="bg-dark text-white text-center py-3 mt-5">
     <small>&copy; 2025 medimage2report. All rights reserved. Version 1.0</small>
-    <div class="disclaimer">
-      <p>
-        <strong>Disclaimer:</strong> AI is a supporting tool—final decisions rest with the radiologist.
-        Protect patient data per local regulations. MedImage2Report is not responsible for AI output accuracy.
-      </p>
-    </div>
   </footer>
 
   <script>
-    function copyText(id){
-      navigator.clipboard.writeText(
-        document.getElementById(id).innerText
-      ).then(_=>alert('Copied!'));
+    // Global variable to track the currently selected language
+    let currentLang = 'en';
+
+    function switchLanguage(lang) {
+      if (lang === currentLang) return; // Do nothing if language is already selected
+
+      currentLang = lang;
+
+      // Select all language-specific content elements
+      const contentElements = document.querySelectorAll('.lang-en, .lang-de');
+      contentElements.forEach(el => {
+        // Hide all elements initially
+        el.style.display = 'none';
+      });
+
+      // Show only the elements for the selected language
+      const activeElements = document.querySelectorAll(`.lang-${lang}`);
+      activeElements.forEach(el => {
+        el.style.display = 'block';
+      });
+
+      // Update the active state of the toggle buttons
+      const btnEn = document.getElementById('btn-lang-en');
+      const btnDe = document.getElementById('btn-lang-de');
+
+      if (lang === 'en') {
+        btnEn.classList.add('active', 'btn-primary');
+        btnEn.classList.remove('btn-outline-primary');
+        btnDe.classList.remove('active', 'btn-primary');
+        btnDe.classList.add('btn-outline-primary');
+      } else {
+        btnDe.classList.add('active', 'btn-primary');
+        btnDe.classList.remove('btn-outline-primary');
+        btnEn.classList.remove('active', 'btn-primary');
+        btnEn.classList.add('btn-outline-primary');
+      }
     }
 
-    function toggleInstructions() {
-      const box = document.getElementById("instructionBox");
-      const btn = document.getElementById("toggleBtn");
+    // A smarter copy function that copies the currently visible text
+    function copyActiveText(buttonElement) {
+      // Find the parent card, then the content wrapper inside it
+      const wrapper = buttonElement.closest('.card').querySelector('.report-content-wrapper');
+      // Find the currently active language div inside the wrapper
+      const activeContent = wrapper.querySelector(`.lang-${currentLang}`);
 
-      if (box.style.display === "none") {
-        box.style.display = "block";
-        btn.textContent = "Hide Instructions";
-      } else {
-        box.style.display = "none";
-        btn.textContent = "Show Instructions";
+      if (activeContent) {
+        navigator.clipboard.writeText(activeContent.innerText)
+          .then(() => alert('Copied!'))
+          .catch(err => console.error('Failed to copy text: ', err));
       }
     }
   </script>

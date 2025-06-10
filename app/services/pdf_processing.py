@@ -81,11 +81,10 @@ def extract_pdf_content(pdf_blob: bytes, lang: str = "deu") -> dict:
     }
 
 
-
 def build_prompt(structured_data: dict) -> str:
     """
     Build a structured OpenAI prompt from extracted OCR text,
-    requesting a strictly formatted JSON response.
+    requesting a strictly formatted JSON response with content in both English and German.
     """
     # Ensure we safely extract the raw text string
     extracted_text = structured_data.get("raw_text", "")
@@ -98,7 +97,7 @@ def build_prompt(structured_data: dict) -> str:
     return (
     "You are a radiologist and language model assistant. Your task is to generate structured report content "
     "based solely on the extracted text from a PDF file. This PDF contains output from an AI-based medical image analysis system, "
-    "which has processed DICOM data and presented findings in both text and tables, it might be in German Language, too.\n\n"
+    "which has processed DICOM data and presented findings in both text and tables. The source text may be in English or German.\n\n"
 
     "**Context and Constraints:**\n"
     "- You do NOT have access to the original images—only to the extracted PDF text.\n"
@@ -108,32 +107,33 @@ def build_prompt(structured_data: dict) -> str:
     "- Special care must be taken to interpret tables and associated units correctly to avoid clinical misinterpretation.\n\n"
 
     "**Output Requirements:**\n"
-    "You must return a JSON object that strictly follows this structure:\n"
+    "You must return a SINGLE JSON object that strictly follows this structure. The textual report content MUST be provided in both English and German.\n"
     "```json\n"
     "{\n"
-    "  \"company\": string,                 // e.g. 'mediaire'\n"
-    "  \"sequences\": [string, ...],        // e.g. ['Accelerated Sag IR-FSPGR (T1)', 'tse2d1_3']\n"
-    "  \"method\": string,                  // e.g. 'AI-assisted volumetry using mdbrain v4.7.0'\n"
-    "  \"region\": string,                  // e.g. 'Brain', 'Spine lumbar'\n"
-    "  \"modality\": string,                // e.g. 'MR', 'CT'\n"
-    "  \"short_text\": string,              // RSNA-style summary for radiology report integration\n"
-    "  \"long_text\": string,               // Layperson-friendly version of the above\n"
-    "  \"quality\": string                  // e.g. 'Good', 'Insufficient resolution', or comments from quality control\n"
+    "  \"company\": \"string\",                 // e.g. 'mediaire'\n"
+    "  \"sequences\": [\"string\", ...],        // e.g. [\"Accelerated Sag IR-FSPGR (T1)\", \"tse2d1_3\"]\n"
+    "  \"method\": \"string\",                  // e.g. 'AI-assisted volumetry using mdbrain v4.7.0'\n"
+    "  \"region\": \"string\",                  // e.g. 'Brain', 'Spine lumbar'\n"
+    "  \"modality\": \"string\",                // e.g. 'MR', 'CT'\n"
+    "  \"short_text_en\": \"string\",           // RSNA-style summary for radiology report integration, in ENGLISH.\n"
+    "  \"long_text_en\": \"string\",            // Layperson-friendly version of the above, in ENGLISH.\n"
+    "  \"short_text_de\": \"string\",           // RSNA-style summary for radiology report integration, in GERMAN (Befund-Stil).\n"
+    "  \"long_text_de\": \"string\",            // Layperson-friendly version of the above, in GERMAN (laienfreundliche Sprache).\n"
+    "  \"quality\": \"string\"                  // e.g. 'Good', 'Insufficient resolution', or comments from quality control\n"
     "}\n"
     "```\n\n"
 
     "**Generation Instructions:**\n"
     "- First, Carefully read and internally structure the extracted PDF text.\n"
-    "- Then, Identify findings (e.g. lesions found), quantitative values (e.g. volumes, percentiles), methods used, and any classifications."
-    "- If tables are included, extract values with correct units and associate them with the proper anatomical regions.\n"
-    "- Cross-reference repeated or redundant values. Only include the most complete and correct version.\n"
-    "- In the *short_text*, include company, method, modality, sequence/series, region, and key findings. Mention image numbers if available.\n"
-    "- In the *long_text*, explain the same findings in accessible terms for patients, including comparisons if available (e.g. “reduced hippocampus volume compared to previous study”).\n\n"
+    "- Then, Identify findings (e.g. lesions found), quantitative values (e.g. volumes, percentiles), methods used, and any classifications.\n"
+    "- In the `short_text_en`, write a concise, professional summary in English suitable for a radiology report. Include company, method, and key findings.\n"
+    "- In the `long_text_en`, explain the same findings in accessible English terms for patients.\n"
+    "- In the `short_text_de`, write a concise, professional summary in German suitable for a radiology report (im Stil eines ärztlichen Befundes).\n"
+    "- In the `long_text_de`, explain the same findings in accessible German terms for patients (in einer für Laien verständlichen Sprache).\n\n"
 
     "Begin your analysis using the following extracted text:\n\n"
-    f"{extracted_text}"
+    f"\"{extracted_text}\""
 )
-
 
 
 def call_openai(prompt):

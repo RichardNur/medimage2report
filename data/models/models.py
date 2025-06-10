@@ -70,11 +70,17 @@ class ProcessedImageAnalysisData(db.Model):
     body_region  = Column(String(100), nullable=True)
     modality     = Column(String(100), nullable=True)
 
-    # existing fields
+    # --- English Reports (Original) ---
     report_section_short_openai = Column(Text, nullable=True)
     report_section_long_openai  = Column(Text, nullable=True)
     report_section_short_gemini = Column(Text, nullable=True)
     report_section_long_gemini  = Column(Text, nullable=True)
+
+    # --- GERMAN REPORTS (NEW) ---
+    report_section_short_openai_de = Column(Text, nullable=True)
+    report_section_long_openai_de  = Column(Text, nullable=True)
+    report_section_short_gemini_de = Column(Text, nullable=True)
+    report_section_long_gemini_de  = Column(Text, nullable=True)
 
     report_quality_score = Column(String(10), nullable=True)
     created_at           = Column(DateTime, default=datetime.now(timezone.utc), nullable=False)

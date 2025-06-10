@@ -190,6 +190,9 @@ class ProcessedDataManager:
         modality,
         report_section_short_openai, report_section_long_openai,
         report_section_short_gemini, report_section_long_gemini,
+        # --- Add new German fields to the method signature ---
+        report_section_short_openai_de, report_section_long_openai_de,
+        report_section_short_gemini_de, report_section_long_gemini_de,
         report_quality_score, created_at
     ):
         try:
@@ -201,10 +204,17 @@ class ProcessedDataManager:
                 method_used=method_used,
                 body_region=body_region,
                 modality=modality,
+                # English fields
                 report_section_short_openai=report_section_short_openai,
                 report_section_long_openai=report_section_long_openai,
                 report_section_short_gemini=report_section_short_gemini,
                 report_section_long_gemini=report_section_long_gemini,
+                # --- Assign new German fields ---
+                report_section_short_openai_de=report_section_short_openai_de,
+                report_section_long_openai_de=report_section_long_openai_de,
+                report_section_short_gemini_de=report_section_short_gemini_de,
+                report_section_long_gemini_de=report_section_long_gemini_de,
+                # Remaining fields
                 report_quality_score=report_quality_score,
                 created_at=created_at
             )
