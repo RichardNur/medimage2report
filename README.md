@@ -55,12 +55,8 @@ This project integrates into **radiological reporting workflows** where AI tools
 | User authentication (Flask-Login)| ✅ Implemented |
 | PDF upload & AI extraction       | ✅ Implemented |
 | GPT-based RSNA text generation   | ✅ Implemented |
-| Web interface for uploads        | ✅ Live        |
-| Error logging                    | ✅ Live        |
-| TBC Recognizer (DICOM Upload)    | 🔄 Planned     |
-| PACS/RIS integration             | 🔄 Planned     |
-| Export: DICOM-SR / HL7 / PDF     | 🔄 Planned     |
-| Docker deployment                | 🔄 Planned     |
+| Web interface for uploads        | ✅ Implemented |
+| Error logging                    | ✅ Implemented |
 
 ---
 
